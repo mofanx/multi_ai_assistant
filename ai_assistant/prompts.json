@@ -1,8 +1,0 @@
-{
-    "prompts": {
-      "translate_to_english": "将以下文本准确翻译成英文，只输出翻译结果，不要添加任何解释或额外内容。",
-      "translate_to_chinese": "将以下文本准确翻译成中文，只输出翻译结果，不要添加任何解释或额外内容。",
-      "convert_to_json": "将以下文本转换成有效的JSON格式，只输出JSON结果，不要添加任何解释或额外内容。",
-      "convert_json_to_md": "将以下JSON格式文本转换成Markdown格式，只输出Markdown结果，不要添加任何解释或额外内容。"
-    }
-  }

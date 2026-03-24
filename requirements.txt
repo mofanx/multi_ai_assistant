@@ -1,7 +1,9 @@
 keyboard
 pygame
-asyncio
 requests
-openai
+litellm
 pyclip
 aiohttp
+pyyaml
+fastapi
+uvicorn

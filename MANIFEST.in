@@ -1,2 +1,3 @@
-include ai_assistant/prompts.json
+include ai_assistant/default_config.yaml
 recursive-include ai_assistant *.py
+recursive-include ai_assistant/web/static *

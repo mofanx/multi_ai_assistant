@@ -1,0 +1,100 @@
+# =============================================================================
+# Multi AI Assistant - 默认配置文件
+# 用户配置: ~/.config/multi_ai_assistant/config.yaml (覆盖此处任何配置项)
+#
+# 模型标识符使用 litellm 格式，支持 100+ 提供商，常见示例:
+#   "gpt-4o-mini"                          → OpenAI
+#   "gemini/gemini-2.0-flash"              → Google Gemini
+#   "anthropic/claude-3-5-sonnet-20241022" → Anthropic
+#   "groq/llama-3.1-70b-versatile"         → Groq
+#   "deepseek/deepseek-chat"               → DeepSeek
+#   "openai/my-model"                      → 自定义 OpenAI 兼容 API (需配合 api_base_env)
+#
+# 完整列表: https://docs.litellm.ai/docs/providers
+# =============================================================================
+
+version: "2.1.0"
+
+# ===== 模型定义 =====
+# 每个模型只需一个 model 字段（litellm 格式）。
+# litellm 会自动从标准环境变量读取 API 密钥（如 OPENAI_API_KEY、GEMINI_API_KEY）。
+# 仅在使用自定义/自托管端点时，才需要指定 api_key_env 和 api_base_env。
+#
+# 可选字段:
+#   api_key_env:       API 密钥环境变量名 (litellm 标准 Provider 可省略)
+#   api_base_env:      API 地址环境变量名 (自定义端点时使用)
+#   stream:            是否流式输出 (默认 true)
+#   enable_search:     是否启用联网搜索 (默认 false)
+#   enable_reasoning:  是否输出推理过程 (默认 false, 用于推理模型)
+#   type:              模型类型 (默认 "litellm", 特殊值 "qwen_web" 用于 Qwen Web API)
+#   extra_params:      传递给 litellm 的额外参数 (dict)
+
+models: {}
+# 用户需要手动添加模型配置，例如:
+# models:
+#   gpt4_mini:
+#     model: "gpt-4o-mini"
+#     api_key_env: "OPENAI_API_KEY"
+#     enable_search: true
+
+# ===== API 渠道配置 =====
+# 用户需要手动添加渠道配置，例如:
+# channels:
+#   openai:
+#     type: "channel"
+#     provider: "openai"
+#     api_key_env: "OPENAI_API_KEY"
+#     description: "OpenAI 官方渠道"
+#   
+#   moonshot:
+#     type: "channel"
+#     provider: "custom"
+#     api_base_env: "MOONSHOT_API_BASE"
+#     api_key_env: "MOONSHOT_API_KEY"
+#     description: "Moonshot AI 渠道"
+
+channels: {}
+
+# ===== 角色 (模型 + Prompt 组合) =====
+# base_model: 对应 models 中的 key
+# prompt_key: 对应 prompts 中的 key
+#
+# 示例:
+#   translator:
+#     base_model: your_model_key
+#     prompt_key: translate_to_english
+
+roles: {}
+
+# ===== Prompt 模板 =====
+# 内置常用 Prompt，可在用户配置中添加更多
+
+prompts:
+  translate_to_english: "将以下文本准确翻译成英文，只输出翻译结果。"
+  translate_to_chinese: "将以下文本准确翻译成中文，只输出翻译结果。"
+
+# ===== 快捷键绑定 =====
+# action 可选值:
+#   chat    - 模型对话 (需要 target 指定模型 key)
+#   role    - 角色对话 (需要 target 指定角色 key)
+#   cancel  - 取消当前操作
+#   reload  - 热重载配置
+#   exit    - 退出程序
+
+hotkeys:
+  # 示例快捷键（用户需要先添加模型后才能使用）
+  # "f9+a": { action: "chat", target: "your_model_key" }
+  "esc":  { action: "cancel" }
+  "f9+r": { action: "reload" }
+  "esc+f9": { action: "exit" }
+
+# ===== Web 管理界面 =====
+web:
+  enabled: false
+  host: "127.0.0.1"
+  port: 8199
+
+# ===== 日志 =====
+logging:
+  level: "INFO"
+  file: ""

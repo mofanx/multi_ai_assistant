@@ -1,48 +1,31 @@
 """
-AI 助手项目
+Multi AI Assistant - 通过快捷键在任意界面调用 AI 大模型
 
-本项目是一个通过快捷键调用不同AI模型进行对话的Python脚本，支持多种AI模型和TTS（文本转语音）功能。
+基于 litellm 支持 100+ AI 提供商，专注于大模型对话能力。
+通过 YAML 配置 + CLI 子命令灵活管理模型、快捷键和 Prompt。
 """
 
-__version__ = "1.0.2"
-
-# 从 assistant 子包导入所有公开的类和函数
-from .assistant import (
-    get_clipboard_content, 
-    type_result, 
-    cancel_current_chat, 
-    clear_possible_char,
-    QwenAssistant,
-    QWQAssistant,
-    OpenAIAssistant,
-    TTSClient,
-    ChatWithTTSStream,
-    ChatWithTTSNoStream,
-    ScreenshotOCRLLM,
-    BaimiaoScreenshotOCR,
-    PiclabUploader,
-    screenshot_and_upload_piclab
-)
+__version__ = "2.1.0"
 
 from .ai_assistant import AI_Assistant
+from .config import get_config, ConfigManager
+from .utils import (
+    clear_possible_char,
+    get_clipboard_content,
+    type_result,
+    cancel_current_chat,
+    send_system_notification,
+)
+from .assistant.openai_model import OpenAIAssistant
 
-# 定义公开的API
 __all__ = [
+    'AI_Assistant',
+    'get_config',
+    'ConfigManager',
+    'clear_possible_char',
     'get_clipboard_content',
     'type_result',
     'cancel_current_chat',
-    'clear_possible_char',
-    'QwenAssistant',
-    'QWQAssistant',
+    'send_system_notification',
     'OpenAIAssistant',
-    'TTSClient',
-    'ChatWithTTSStream',
-    'ChatWithTTSNoStream',
-    'ScreenshotOCRLLM',
-    'BaimiaoScreenshotOCR',
-    'AI_Assistant',
-    'PiclabUploader',
-    'screenshot_and_upload_piclab'
 ]
-
-print("AI助手已导入")

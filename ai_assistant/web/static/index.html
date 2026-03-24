@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi AI Assistant - 管理面板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .fade-in { animation: fadeIn 0.2s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #2563eb; font-weight: 600; }
+        .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        .dark .card { background: #1f2937; border-color: #374151; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-outline { background: white; color: #374151; border: 1px solid #d1d5db; }
+        .btn-outline:hover { background: #f9fafb; }
+        .dark .btn-outline { background: #374151; color: #d1d5db; border-color: #4b5563; }
+        .dark .btn-outline:hover { background: #4b5563; }
+        .input { padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 0.875rem; width: 100%; }
+        .input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .dark .input { background: #374151; border-color: #4b5563; color: white; }
+        .dark .input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,0.1); }
+        .badge { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-yellow { background: #fef3c7; color: #92400e; }
+        
+        /* 深色模式样式 */
+        .dark .badge-green { background: #166534; color: #dcfce7; }
+        .dark .badge-red { background: #991b1b; color: #fee2e2; }
+        .dark .badge-blue { background: #1e40af; color: #dbeafe; }
+        .dark .badge-gray { background: #374151; color: #d1d5db; }
+        .dark .badge-yellow { background: #92400e; color: #fef3c7; }
+        
+        /* 深色模式文本样式 */
+        .dark .text-gray-500 { color: #9ca3af !important; }
+        .dark .text-gray-600 { color: #d1d5db !important; }
+        .dark .text-gray-700 { color: #e5e7eb !important; }
+        .dark .text-gray-900 { color: #ffffff !important; }
+        .dark .text-gray-400 { color: #d1d5db !important; }
+        .dark .text-gray-300 { color: #e5e7eb !important; }
+        .dark .text-gray-200 { color: #f3f4f6 !important; }
+        .dark .text-gray-100 { color: #f9fafb !important; }
+        
+        /* 深色模式其他文本 */
+        .dark .text-sm { color: #d1d5db; }
+        .dark .text-lg { color: #ffffff; }
+        .dark .text-xl { color: #ffffff; }
+        .dark .text-2xl { color: #ffffff; }
+        .dark .font-semibold { color: #ffffff; }
+        .dark .font-medium { color: #ffffff; }
+        .dark .font-bold { color: #ffffff; }
+        
+        /* 深色模式链接 */
+        .dark .text-blue-500 { color: #60a5fa !important; }
+        .dark .text-blue-500:hover { color: #3b82f6 !important; }
+        .dark .text-red-500 { color: #f87171 !important; }
+        .dark .text-red-500:hover { color: #ef4444 !important; }
+        .dark .text-green-500 { color: #4ade80 !important; }
+        .dark .text-green-500:hover { color: #22c55e !important; }
+        
+        /* 深色模式表格 */
+        .dark .table th { color: #ffffff !important; border-color: #374151 !important; }
+        .dark .table td { color: #d1d5db !important; border-color: #374151 !important; }
+        
+        /* 深色模式切换开关 */
+        .dark-mode-toggle {
+            position: relative;
+            display: inline-block;
+            width: 3rem;
+            height: 1.5rem;
+        }
+        
+        .dark-mode-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: .4s;
+            border-radius: 1.5rem;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 1.125rem;
+            width: 1.125rem;
+            left: 0.1875rem;
+            bottom: 0.1875rem;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #3b82f6;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(1.5rem);
+        }
+        
+        .dark .slider {
+            background-color: #475569;
+        }
+        
+        .dark input:checked + .slider {
+            background-color: #60a5fa;
+        }
+        
+        /* 深色模式 kbd 元素 */
+        .dark kbd { 
+            background: #374151 !important; 
+            color: #ffffff !important; 
+            border-color: #4b5563 !important;
+        }
+        
+        /* 自定义下拉框样式 */
+        .custom-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        
+        .dropdown-trigger {
+            position: relative;
+            width: 100%;
+        }
+        
+        .dropdown-trigger input {
+            padding-right: 2.5rem;
+            cursor: pointer;
+        }
+        
+        .dropdown-arrow {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-size: 0.75rem;
+            pointer-events: none;
+            transition: transform 0.2s;
+        }
+        
+        .dropdown-arrow.open {
+            transform: translateY(-50%) rotate(180deg);
+        }
+        
+        .dropdown-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 0.25rem;
+        }
+        
+        .dark .dropdown-options {
+            background: #374151;
+            border-color: #4b5563;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        
+        .dropdown-option {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.15s;
+        }
+        
+        .dropdown-option:last-child {
+            border-bottom: none;
+        }
+        
+        .dropdown-option:hover {
+            background: #f9fafb;
+        }
+        
+        .dark .dropdown-option {
+            color: white;
+            border-bottom-color: #4b5563;
+        }
+        
+        .dark .dropdown-option:hover {
+            background: #4b5563;
+        }
+        
+        .dropdown-option.selected {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .dark .dropdown-option.selected {
+            background: #1e3a8a;
+            color: #93c5fd;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Multi AI Assistant</h1>
+                        <span class="badge badge-blue" id="version">v2.1.0</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="badge badge-green" id="statusBadge">● 运行中</span>
+                        <label class="dark-mode-toggle">
+                            <input type="checkbox" id="darkModeToggle">
+                            <span class="slider"></span>
+                        </label>
+                        <button onclick="reloadConfig()" class="btn btn-outline text-sm">↻ 重载配置</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex space-x-8" id="tabs">
+                    <button onclick="switchTab('dashboard')" class="py-3 px-1 text-sm tab-active dark:text-white dark:border-blue-400" data-tab="dashboard">概览</button>
+                    <button onclick="switchTab('providers')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="providers">API 渠道</button>
+                    <button onclick="switchTab('models')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="models">模型管理</button>
+                    <button onclick="switchTab('roles')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="roles">角色管理</button>
+                    <button onclick="switchTab('prompts')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="prompts">Prompt 管理</button>
+                    <button onclick="switchTab('hotkeys')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="hotkeys">快捷键管理</button>
+                    <button onclick="switchTab('env-check')" class="py-3 px-1 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-tab="env-check">环境变量检查</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- Dashboard -->
+            <div id="panel-dashboard" class="fade-in">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="card p-5">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">模型数量</div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white" id="stat-models">-</div>
+                    </div>
+                    <div class="card p-5">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">角色数量</div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white" id="stat-roles">-</div>
+                    </div>
+                    <div class="card p-5">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">快捷键数量</div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white" id="stat-hotkeys">-</div>
+                    </div>
+                    <div class="card p-5">
+                        <div class="text-sm text-gray-500 dark:text-gray-400 mb-1">Provider 数量</div>
+                        <div class="text-2xl font-bold text-gray-900 dark:text-white" id="stat-providers">-</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h3 class="text-lg font-semibold mb-4 dark:text-white">Provider 健康状态</h3>
+                        <div id="health-list" class="space-y-2"></div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-lg font-semibold mb-4 dark:text-white">配置信息</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">配置文件</span><span id="cfg-path" class="font-mono text-gray-700 dark:text-gray-300">-</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Web 端口</span><span id="cfg-port" class="text-gray-700 dark:text-gray-300">-</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Providers -->
+            <div id="panel-providers" class="fade-in hidden">
+                <!-- 错误提示区域 -->
+                <div id="provider-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <span class="text-red-400 text-lg">❌</span>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="text-sm font-medium text-red-800">保存失败</h3>
+                            <div class="mt-1 text-sm text-red-700" id="provider-error-message"></div>
+                            <div class="mt-2 text-xs text-red-600" id="provider-error-suggestion"></div>
+                        </div>
+                        <div class="ml-auto pl-3">
+                            <button onclick="clearProviderError()" class="text-red-400 hover:text-red-600">
+                                <span class="sr-only">关闭</span>
+                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between mb-4">
+                    <button onclick="showProviderForm()" class="btn btn-primary">+ 添加渠道</button>
+                </div>
+                
+                <!-- 渠道添加表单 -->
+                <div id="provider-form" class="card p-4 mb-4 hidden">
+                    <h3 class="text-md font-semibold mb-3">添加新渠道</h3>
+                    <div class="space-y-4">
+                        <select id="pf-type" class="input" onchange="onProviderTypeChange()">
+                            <option value="">选择渠道类型...</option>
+                            <option value="standard">🌐 标准 LiteLLM 渠道</option>
+                            <option value="custom">🔧 自定义渠道</option>
+                        </select>
+                        
+                        <!-- 标准渠道配置 -->
+                        <div id="pf-standard-section" class="space-y-3 hidden">
+                            <select id="pf-provider" class="input" onchange="onStandardProviderChange()">
+                                <option value="">选择标准提供商...</option>
+                            </select>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <div id="pf-provider-info"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input id="pf-standard-api-key" class="input" placeholder="API Key (可选，也可使用环境变量)">
+                                <input id="pf-standard-api-key-env" class="input" placeholder="API Key 环境变量名 (如 OPENAI_API_KEY)">
+                            </div>
+                        </div>
+                        
+                        <!-- 自定义渠道配置 -->
+                        <div id="pf-custom-section" class="space-y-3 hidden">
+                            <input id="pf-name" class="input" placeholder="渠道名称 (如 moonshot)">
+                            <select id="pf-compatibility" class="input" onchange="onCompatibilityChange()">
+                                <option value="">选择兼容类型...</option>
+                                <option value="openai">🌐 OpenAI 兼容 API</option>
+                                <option value="anthropic">🤖 Anthropic 兼容 API</option>
+                                <option value="google">🔍 Google 兼容 API</option>
+                                <option value="azure">☁️ Azure OpenAI 兼容 API</option>
+                                <option value="cohere">📝 Cohere 兼容 API</option>
+                                <option value="groq">⚡ Groq 兼容 API</option>
+                                <option value="mistral">🌫️ Mistral 兼容 API</option>
+                                <option value="together">🔗 Together AI 兼容 API</option>
+                                <option value="other">🔧 其他兼容 API</option>
+                            </select>
+                            <div id="pf-compatibility-info" class="text-sm text-gray-600 mb-2"></div>
+                            <div class="text-sm text-gray-600 mb-2">
+                                API 配置（每组二选一即可）
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input id="pf-custom-api-base" class="input" placeholder="API Base URL (如 https://api.moonshot.cn/v1)">
+                                <input id="pf-custom-api-base-env" class="input" placeholder="API Base 环境变量名 (如 MOONSHOT_API_BASE)">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input id="pf-custom-api-key" class="input" placeholder="API Key (可选，也可使用环境变量)">
+                                <input id="pf-custom-api-key-env" class="input" placeholder="API Key 环境变量名 (如 MOONSHOT_API_KEY)">
+                            </div>
+                            <input id="pf-description" class="input" placeholder="渠道描述 (可选)">
+                        </div>
+                    </div>
+                    <div class="mt-4 flex space-x-2">
+                        <button onclick="saveProvider()" class="btn btn-primary">保存</button>
+                        <button onclick="hideProviderForm()" class="btn btn-outline">取消</button>
+                    </div>
+                </div>
+                
+                <!-- 渠道列表 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="providers-grid"></div>
+            </div>
+
+            <!-- Models -->
+            <div id="panel-models" class="fade-in hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold dark:text-white">模型配置</h2>
+                    <button onclick="showModelForm()" class="btn btn-primary">+ 添加模型</button>
+                </div>
+                <div id="model-form" class="card p-4 mb-4 hidden">
+                    <div class="space-y-4">
+                        <!-- 主要配置区域：从左到右排列 -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- API渠道选择 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API 渠道</label>
+                                <select id="mf-provider" class="input" onchange="onProviderSelectChange()">
+                                    <option value="">选择 API 渠道...</option>
+                                </select>
+                                <div class="text-sm text-blue-600 mt-1" id="mf-loading-hint" style="display: none;">
+                                    🔄 正在加载模型列表...
+                                </div>
+                            </div>
+                            
+                            <!-- 模型选择 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">模型</label>
+                                <div class="relative" id="mf-model-container">
+                                    <!-- 自定义下拉框 -->
+                                    <div class="custom-dropdown" id="mf-model-dropdown">
+                                        <div class="dropdown-trigger" onclick="toggleModelDropdown()">
+                                            <input type="text" id="mf-model-input" class="input" placeholder="先选择渠道..." readonly>
+                                            <span class="dropdown-arrow">▼</span>
+                                        </div>
+                                        <div class="dropdown-options" id="mf-model-options" style="display: none;">
+                                            <!-- 动态加载的模型选项 -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 模型ID -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">模型 ID</label>
+                                <div class="relative">
+                                    <input id="mf-key" class="input pr-8" placeholder="自动生成或自定义" onchange="onModelIdChange()">
+                                    <button type="button" onclick="toggleModelIdMode()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600" id="mf-key-mode-btn" title="切换生成模式">
+                                        <span id="mf-key-mode-icon">🔄</span>
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-500 mt-1" id="mf-key-hint">
+                                    💡 自动生成模型ID
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 选项配置区域 -->
+                        <div class="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center space-x-4 text-sm">
+                                <label class="flex items-center space-x-2"><input type="checkbox" id="mf-search"><span>启用搜索</span></label>
+                                <label class="flex items-center space-x-2"><input type="checkbox" id="mf-reasoning"><span>启用推理</span></label>
+                                <label class="flex items-center space-x-2"><input type="checkbox" id="mf-no-stream"><span>非流式</span></label>
+                            </div>
+                            <button onclick="refreshProviderModels()" class="text-blue-600 hover:text-blue-800 underline text-sm">刷新模型列表</button>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex space-x-2">
+                        <button onclick="saveModel()" class="btn btn-primary">保存</button>
+                        <button onclick="hideModelForm()" class="btn btn-outline">取消</button>
+                    </div>
+                </div>
+                <!-- 模型搜索对话框 -->
+                <div id="model-search-modal" class="card p-4 mb-4 hidden">
+                    <h3 class="text-lg font-semibold mb-4">搜索可用模型</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                        <input id="ms-query" class="input" placeholder="搜索关键词 (如 gpt-4o)">
+                        <select id="ms-provider" class="input">
+                            <option value="">所有提供商</option>
+                        </select>
+                        <input id="ms-limit" class="input" type="number" placeholder="结果数量" value="20">
+                    </div>
+                    <div class="flex space-x-2 mb-4">
+                        <button onclick="doSearchModels()" class="btn btn-primary">搜索</button>
+                        <button onclick="hideSearchModels()" class="btn btn-outline">关闭</button>
+                    </div>
+                    <div id="ms-results" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                </div>
+                <div class="card overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700 text-left"><tr>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-32">模型 ID</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-28">类别</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 min-w-48">模型标识符</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-28">API 渠道</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 min-w-32">环境变量</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-24">选项</th>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-20">操作</th>
+                        </tr></thead>
+                        <tbody id="models-table" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Roles -->
+            <div id="panel-roles" class="fade-in hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold dark:text-white">角色配置</h2>
+                    <button onclick="showRoleForm()" class="btn btn-primary">+ 添加角色</button>
+                </div>
+                <div id="role-form" class="card p-4 mb-4 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input id="rf-key" class="input" placeholder="角色 ID (如 translator)">
+                        <select id="rf-base" class="input">
+                            <option value="">选择基础模型...</option>
+                        </select>
+                        <select id="rf-prompt" class="input">
+                            <option value="">选择 Prompt...</option>
+                        </select>
+                    </div>
+                    <div class="mt-3 flex space-x-2">
+                        <button onclick="saveRole()" class="btn btn-primary">保存</button>
+                        <button onclick="hideRoleForm()" class="btn btn-outline">取消</button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700 text-left"><tr>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">角色 ID</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">基础模型</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">Prompt ID</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">操作</th>
+                        </tr></thead>
+                        <tbody id="roles-table" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Prompts -->
+            <div id="panel-prompts" class="fade-in hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold dark:text-white">Prompt 模板</h2>
+                    <button onclick="showPromptForm()" class="btn btn-primary">+ 添加 Prompt</button>
+                </div>
+                <div id="prompt-form" class="card p-4 mb-4 hidden">
+                    <div class="space-y-3">
+                        <input id="pf-key" class="input" placeholder="Prompt ID (如 translate_to_english)">
+                        <textarea id="pf-value" class="input" rows="3" placeholder="Prompt 内容"></textarea>
+                    </div>
+                    <div class="mt-3 flex space-x-2">
+                        <button onclick="savePrompt()" class="btn btn-primary">保存</button>
+                        <button onclick="hidePromptForm()" class="btn btn-outline">取消</button>
+                    </div>
+                </div>
+                <div id="prompts-list" class="space-y-3"></div>
+            </div>
+
+            <!-- Hotkeys -->
+            <div id="panel-hotkeys" class="fade-in hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold dark:text-white">快捷键绑定</h2>
+                    <button onclick="showHotkeyForm()" class="btn btn-primary">+ 添加快捷键</button>
+                </div>
+                <div id="hotkey-form" class="card p-4 mb-4 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input id="hf-key" class="input" placeholder="快捷键 (如 f9+g)">
+                        <select id="hf-action" class="input" onchange="onHotkeyActionChange()">
+                            <option value="chat">chat - 模型对话</option>
+                            <option value="role">role - 角色对话</option>
+                            <option value="cancel">cancel - 取消操作</option>
+                            <option value="reload">reload - 重载配置</option>
+                            <option value="exit">exit - 退出程序</option>
+                        </select>
+                        <div id="hf-target-container">
+                            <!-- 目标字段将根据动作类型动态变化 -->
+                        </div>
+                    </div>
+                    <div class="mt-3 flex space-x-2">
+                        <button onclick="saveHotkey()" class="btn btn-primary">保存</button>
+                        <button onclick="hideHotkeyForm()" class="btn btn-outline">取消</button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700 text-left"><tr>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">快捷键</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">动作</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">目标</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">操作</th>
+                        </tr></thead>
+                        <tbody id="hotkeys-table" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Environment Check -->
+            <div id="panel-env-check" class="fade-in hidden">
+                <h2 class="text-lg font-semibold mb-4 dark:text-white">API渠道环境变量检查</h2>
+                <div class="card overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-700 text-left"><tr>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">渠道名称</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">渠道类型</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">状态</th>
+                            <th class="px-4 py-3 font-medium text-gray-500 dark:text-gray-300">环境变量</th>
+                        </tr></thead>
+                        <tbody id="env-check-table" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    <h3 class="text-lg font-semibold mb-4 dark:text-white">支持的 AI 提供商</h3>
+                    <div id="providers-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Toast -->
+        <div id="toast" class="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg text-sm hidden transition-opacity duration-300"></div>
+    </div>
+
+    <script>
+    // ===== Dark Mode =====
+    function initDarkMode() {
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const html = document.documentElement;
+        
+        // 检查本地存储中的深色模式设置
+        const isDarkMode = localStorage.getItem('darkMode') === 'true';
+        
+        // 设置初始状态
+        if (isDarkMode) {
+            html.classList.add('dark');
+            darkModeToggle.checked = true;
+        }
+        
+        // 监听切换事件
+        darkModeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                html.classList.add('dark');
+                localStorage.setItem('darkMode', 'true');
+            } else {
+                html.classList.remove('dark');
+                localStorage.setItem('darkMode', 'false');
+            }
+        });
+        
+        // 监听系统主题变化
+        if (window.matchMedia) {
+            const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            darkModeQuery.addListener((e) => {
+                if (!localStorage.getItem('darkMode')) {
+                    if (e.matches) {
+                        html.classList.add('dark');
+                        darkModeToggle.checked = true;
+                    } else {
+                        html.classList.remove('dark');
+                        darkModeToggle.checked = false;
+                    }
+                }
+            });
+        }
+    }
+    
+    // 页面加载时初始化深色模式
+    document.addEventListener('DOMContentLoaded', initDarkMode);
+    
+    // ===== API helpers =====
+    const api = (path, opts = {}) => fetch(`/api${path}`, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(r => {
+        if (!r.ok) {
+            return r.json().then(err => {
+                throw new Error(err.detail || `HTTP ${r.status}`);
+            });
+        }
+        return r.json();
+    });
+
+    function toast(msg, ms = 2000) {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), ms);
+    }
+
+    // ===== Tab switching =====
+    function switchTab(name) {
+        document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
+        document.getElementById(`panel-${name}`).classList.remove('hidden');
+        document.querySelectorAll('#tabs button').forEach(b => {
+            b.classList.remove('tab-active');
+            b.classList.add('text-gray-500');
+        });
+        document.querySelector(`[data-tab="${name}"]`).classList.add('tab-active');
+        document.querySelector(`[data-tab="${name}"]`).classList.remove('text-gray-500');
+        refreshTab(name);
+    }
+
+    function refreshTab(name) {
+        if (name === 'dashboard') loadDashboard();
+        else if (name === 'providers') loadProviders();
+        else if (name === 'models') loadModels();
+        else if (name === 'roles') loadRoles();
+        else if (name === 'prompts') loadPrompts();
+        else if (name === 'hotkeys') loadHotkeys();
+        else if (name === 'env-check') loadEnvCheck();
+    }
+
+    // ===== Dashboard =====
+    async function loadDashboard() {
+        const [status, config, providers] = await Promise.all([
+            api('/status'), api('/config'), api('/providers/config'),
+        ]);
+        document.getElementById('cfg-path').textContent = status.config_path || '-';
+        document.getElementById('cfg-port').textContent = config.web?.port || '-';
+        document.getElementById('stat-models').textContent = Object.keys(config.models || {}).length;
+        document.getElementById('stat-roles').textContent = Object.keys(config.roles || {}).length;
+        document.getElementById('stat-hotkeys').textContent = Object.keys(config.hotkeys || {}).length;
+        document.getElementById('stat-providers').textContent = Object.keys(providers || {}).length;
+
+        // 自动进行健康检查
+        await autoCheckProvidersHealth(providers);
+        
+        // 重新获取最新的健康状态
+        const updatedProviders = await api('/providers/config');
+        updateHealthDisplay(updatedProviders);
+    }
+
+    async function autoCheckProvidersHealth(providers) {
+        // 自动检查所有渠道的健康状态
+        const healthChecks = [];
+        
+        for (const [name, info] of Object.entries(providers || {})) {
+            // 只对未检查的渠道进行自动检查
+            if (!info.last_check) {
+                healthChecks.push(checkProviderHealth(name, info));
+            }
+        }
+        
+        // 并行执行所有健康检查
+        await Promise.allSettled(healthChecks);
+    }
+
+    async function checkProviderHealth(name, info) {
+        // 检查单个渠道的健康状态
+        try {
+            // 构建测试配置
+            const testConfig = {
+                type: info.type,
+            };
+            
+            if (info.type === 'standard') {
+                testConfig.provider = info.provider;
+                testConfig.api_key = info.api_key;
+                testConfig.api_key_env = info.api_key_env;
+            } else if (info.type === 'custom') {
+                testConfig.name = name;
+                testConfig.api_base = info.api_base;
+                testConfig.api_base_env = info.api_base_env;
+                testConfig.api_key = info.api_key;
+                testConfig.api_key_env = info.api_key_env;
+                testConfig.description = info.description;
+            }
+            
+            // 调用测试接口
+            await api('/providers/test', { method: 'POST', body: testConfig });
+            
+        } catch (error) {
+            // 测试失败，健康状态会自动更新为false
+            console.warn(`渠道 ${name} 健康检查失败:`, error.message);
+        }
+    }
+
+    function updateHealthDisplay(providers) {
+        // 更新健康状态显示
+        const hl = document.getElementById('health-list');
+        hl.innerHTML = '';
+        
+        for (const [name, info] of Object.entries(providers || {})) {
+            // 健康状态显示
+            let statusBadge = '';
+            
+            if (info.last_check) {
+                if (info.healthy === true) {
+                    statusBadge = '<span class="badge badge-green">✓ 健康</span>';
+                } else if (info.healthy === false) {
+                    statusBadge = '<span class="badge badge-red">✗ 异常</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-yellow">⚠ 未知</span>';
+                }
+            } else {
+                statusBadge = '<span class="badge badge-gray">◯ 未检查</span>';
+            }
+            
+            // 渠道类型图标
+            let icon = '';
+            if (info.type === 'custom' || info.provider === 'custom') {
+                icon = '🔧';
+            } else if (info.type === 'standard' || info.provider !== 'custom') {
+                icon = '🌐';
+            } else {
+                icon = '📦';
+            }
+            
+            hl.innerHTML += `<div class="flex items-center justify-between py-1">
+                <span class="font-medium text-sm">${icon} ${name}</span>
+                <div class="space-x-2">${statusBadge}</div>
+            </div>`;
+        }
+    }
+
+    // ===== Providers =====
+    async function loadProviders() {
+        const configProviders = await api('/providers/config');
+        
+        const grid = document.getElementById('providers-grid');
+        grid.innerHTML = '';
+        
+        // 显示所有已配置的渠道（包括标准和自定义）
+        for (const [name, info] of Object.entries(configProviders)) {
+            // 判断渠道类型
+            let icon, typeText;
+            
+            if (info.type === 'custom' || info.provider === 'custom') {
+                icon = '🔧';
+                typeText = '自定义渠道 (OpenAI 兼容)';
+            } else if (info.type === 'standard' || info.provider !== 'custom') {
+                icon = '🌐';
+                typeText = '标准渠道';
+            } else {
+                icon = '📦';
+                typeText = '渠道配置';
+            }
+            
+            // 检查健康状态
+            let healthStatus = '';
+            if (info.last_check) {
+                if (info.healthy === true) {
+                    healthStatus = '<span class="text-green-500">✅ 健康</span>';
+                } else if (info.healthy === false) {
+                    healthStatus = '<span class="text-red-500">❌ 异常</span>';
+                }
+            }
+            // 如果没有检查过，不显示任何状态
+            
+            grid.innerHTML += `<div class="card p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium text-sm">${icon} ${name}</span>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs">${healthStatus}</span>
+                        <button onclick="editProvider('${name}')" class="text-blue-500 hover:text-blue-700 text-xs">编辑</button>
+                        <button onclick="deleteProvider('${name}')" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mb-2">${typeText}</div>
+                <div class="text-xs text-gray-600">
+                    ${info.type === 'custom' ? `<div>渠道类型: 自定义渠道</div>` : ''}
+                    ${info.type === 'standard' ? `<div>渠道类型: 标准渠道</div>` : ''}
+                    ${info.api_key_env ? `<div>API Key: ${info.api_key_env}</div>` : ''}
+                    ${info.api_key ? `<div>API Key: 已配置</div>` : ''}
+                    ${info.api_base_env ? `<div>API Base: ${info.api_base_env}</div>` : ''}
+                    ${info.api_base ? `<div>API Base: ${info.api_base}</div>` : ''}
+                    ${info.description ? `<div>描述: ${info.description}</div>` : ''}
+                    ${info.last_check ? `<div>最后检查: ${new Date(info.last_check).toLocaleString()}</div>` : ''}
+                </div>
+            </div>`;
+        }
+        
+        // 如果没有配置任何渠道，显示提示
+        if (Object.keys(configProviders).length === 0) {
+            grid.innerHTML = `<div class="flex items-center justify-center h-64 w-full" style="display: flex !important; grid-column: 1 / -1;" id="empty-providers-message">
+                <div class="text-center text-gray-500">
+                    <div class="text-4xl mb-4">📭</div>
+                    <div class="text-lg font-medium mb-2">还没有配置任何渠道</div>
+                    <div class="text-sm">点击上方"添加渠道"开始配置</div>
+                </div>
+            </div>`;
+        }
+    }
+
+    function showProviderForm() {
+        document.getElementById('provider-form').classList.remove('hidden');
+        loadStandardProviders();
+        // 显示表单时隐藏空状态提示
+        const emptyMessage = document.getElementById('empty-providers-message');
+        if (emptyMessage) {
+            emptyMessage.style.display = 'none';
+        }
+    }
+
+    function showProviderEditForm() {
+        // 隐藏渠道列表，只显示编辑表单
+        const grid = document.getElementById('providers-grid');
+        grid.style.display = 'none';
+        
+        // 隐藏添加按钮
+        const addButton = document.querySelector('button[onclick="showProviderForm()"]');
+        if (addButton) {
+            addButton.parentElement.style.display = 'none';
+        }
+        
+        // 显示表单
+        document.getElementById('provider-form').classList.remove('hidden');
+        loadStandardProviders();
+    }
+
+    function hideProviderForm() {
+        document.getElementById('provider-form').classList.add('hidden');
+        // 清除错误提示
+        clearProviderError();
+        
+        // 恢复渠道列表显示
+        const grid = document.getElementById('providers-grid');
+        grid.style.display = 'grid';
+        
+        // 恢复添加按钮显示
+        const addButton = document.querySelector('button[onclick="showProviderForm()"]');
+        if (addButton) {
+            addButton.parentElement.style.display = 'flex';
+        }
+        
+        // 重置表单按钮
+        const saveBtn = document.querySelector('button[onclick*="updateProvider"], button[onclick="saveProvider()"]');
+        if (saveBtn) {
+            saveBtn.textContent = '保存';
+            saveBtn.setAttribute('onclick', 'saveProvider()');
+        }
+        
+        // 清空表单
+        document.getElementById('pf-type').value = '';
+        onProviderTypeChange();
+    }
+
+    function showProviderError(message, suggestion) {
+        const errorDiv = document.getElementById('provider-error');
+        const messageDiv = document.getElementById('provider-error-message');
+        const suggestionDiv = document.getElementById('provider-error-suggestion');
+        
+        errorDiv.classList.remove('hidden');
+        messageDiv.textContent = message;
+        suggestionDiv.textContent = suggestion;
+    }
+
+    function clearProviderError() {
+        const errorDiv = document.getElementById('provider-error');
+        errorDiv.classList.add('hidden');
+    }
+
+    async function editProvider(name) {
+        try {
+            // 获取渠道配置
+            const providers = await api('/providers/config');
+            const provider = providers[name];
+            
+            if (!provider) {
+                toast('渠道不存在');
+                return;
+            }
+            
+            // 设置表单类型
+            document.getElementById('pf-type').value = provider.type || 'custom';
+            onProviderTypeChange();
+            
+            // 填充表单数据
+            if (provider.type === 'standard') {
+                document.getElementById('pf-provider').value = provider.provider || '';
+                document.getElementById('pf-standard-api-key').value = provider.api_key || '';
+                document.getElementById('pf-standard-api-key-env').value = provider.api_key_env || '';
+            } else {
+                document.getElementById('pf-name').value = name;
+                document.getElementById('pf-compatibility').value = provider.compatibility_type || '';
+                document.getElementById('pf-custom-api-base').value = provider.api_base || '';
+                document.getElementById('pf-custom-api-base-env').value = provider.api_base_env || '';
+                document.getElementById('pf-custom-api-key').value = provider.api_key || '';
+                document.getElementById('pf-custom-api-key-env').value = provider.api_key_env || '';
+                document.getElementById('pf-description').value = provider.description || '';
+                onCompatibilityChange();
+            }
+            
+            // 修改保存按钮为更新模式
+            const saveBtn = document.querySelector('button[onclick="saveProvider()"]');
+            saveBtn.textContent = '更新';
+            saveBtn.setAttribute('onclick', `updateProvider('${name}')`);
+            
+            // 显示编辑表单
+            showProviderEditForm();
+            
+        } catch (error) {
+            toast(`编辑失败: ${error.message}`, 'error');
+        }
+    }
+
+    async function updateProvider(originalName) {
+        const type = document.getElementById('pf-type').value;
+        
+        if (!type) {
+            toast('请选择渠道类型');
+            return;
+        }
+        
+        const config = { type };
+        
+        if (type === 'standard') {
+            const provider = document.getElementById('pf-provider').value;
+            const apiKey = document.getElementById('pf-standard-api-key').value.trim();
+            const apiKeyEnv = document.getElementById('pf-standard-api-key-env').value.trim();
+            
+            if (!provider) {
+                toast('请选择标准提供商');
+                return;
+            }
+            
+            if (!apiKey && !apiKeyEnv) {
+                toast('请填写 API Key 或 API Key 环境变量名（至少一个）');
+                return;
+            }
+            
+            config.provider = provider;
+            config.api_key = apiKey;
+            config.api_key_env = apiKeyEnv;
+            
+        } else if (type === 'custom') {
+            const name = document.getElementById('pf-name').value.trim();
+            const compatibility = document.getElementById('pf-compatibility').value;
+            const apiBase = document.getElementById('pf-custom-api-base').value.trim();
+            const apiBaseEnv = document.getElementById('pf-custom-api-base-env').value.trim();
+            const apiKey = document.getElementById('pf-custom-api-key').value.trim();
+            const apiKeyEnv = document.getElementById('pf-custom-api-key-env').value.trim();
+            const description = document.getElementById('pf-description').value.trim();
+            
+            if (!name) {
+                toast('请填写渠道名称');
+                return;
+            }
+            
+            if (!compatibility) {
+                toast('请选择兼容类型');
+                return;
+            }
+            
+            // API Base 配置（二选一）
+            if (!apiBase && !apiBaseEnv) {
+                toast('请填写 API Base URL 或 API Base 环境变量名（至少一个）');
+                return;
+            }
+            
+            // API Key 配置（二选一）
+            if (!apiKey && !apiKeyEnv) {
+                toast('请填写 API Key 或 API Key 环境变量名（至少一个）');
+                return;
+            }
+            
+            config.name = name;
+            config.provider = 'custom';
+            config.compatibility_type = compatibility;
+            config.api_base = apiBase;
+            config.api_base_env = apiBaseEnv;
+            config.api_key = apiKey;
+            config.api_key_env = apiKeyEnv;
+            config.description = description;
+        }
+        
+        // 显示更新中状态
+        const updateBtn = document.querySelector('button[onclick*="updateProvider"]');
+        const originalText = updateBtn.textContent;
+        
+        // 添加加载动效
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>更新中...</span>';
+        
+        try {
+            // 先测试连接
+            const testResult = await api('/providers/test', { method: 'POST', body: config });
+            
+            if (testResult.success) {
+                // 如果名称改变，先删除旧的
+                if (type === 'custom' && config.name !== originalName) {
+                    await api(`/providers/config/${originalName}`, { method: 'DELETE' });
+                }
+                
+                // 保存配置
+                await api('/providers/config', { method: 'POST', body: config });
+                hideProviderForm();
+                loadProviders();
+                
+                let successMsg = `✅ 渠道已更新`;
+                if (testResult.available_models) {
+                    successMsg += ` (可用模型: ${testResult.available_models})`;
+                }
+                toast(successMsg, 'success');
+            } else {
+                // 测试失败，显示持续的错误信息
+                let suggestion = '';
+                if (testResult.error_type === 'env_var_missing') {
+                    suggestion = '💡 请检查环境变量配置';
+                } else if (testResult.error_type === 'connection_error') {
+                    suggestion = '💡 请检查网络连接和 API 地址';
+                } else if (testResult.error_type === 'timeout') {
+                    suggestion = '💡 请检查网络连接';
+                } else if (testResult.error_type === 'auth_failed') {
+                    suggestion = '💡 请检查 API Key 是否正确';
+                } else if (testResult.error_type === 'rate_limit') {
+                    suggestion = '💡 API 调用频率限制，请稍后重试';
+                } else if (testResult.error_type === 'json_parse_error') {
+                    suggestion = '💡 API 响应格式不正确，请检查 API 地址是否正确';
+                } else {
+                    suggestion = '💡 请检查配置信息并重试';
+                }
+                
+                showProviderError(testResult.error, suggestion);
+            }
+        } catch (error) {
+            toast(`❌ 操作失败: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            updateBtn.disabled = false;
+            updateBtn.textContent = originalText;
+            updateBtn.setAttribute('onclick', `updateProvider('${originalName}')`);
+        }
+    }
+
+    function onProviderTypeChange() {
+        const type = document.getElementById('pf-type').value;
+        const standardSection = document.getElementById('pf-standard-section');
+        const customSection = document.getElementById('pf-custom-section');
+        
+        if (type === 'standard') {
+            standardSection.classList.remove('hidden');
+            customSection.classList.add('hidden');
+            loadStandardProviders();
+        } else if (type === 'custom') {
+            standardSection.classList.add('hidden');
+            customSection.classList.remove('hidden');
+            // 重置兼容类型选择
+            document.getElementById('pf-compatibility').value = '';
+            onCompatibilityChange();
+        } else {
+            standardSection.classList.add('hidden');
+            customSection.classList.add('hidden');
+        }
+    }
+    
+    function onCompatibilityChange() {
+        const compatibility = document.getElementById('pf-compatibility').value;
+        const infoDiv = document.getElementById('pf-compatibility-info');
+        
+        if (!compatibility) {
+            infoDiv.innerHTML = '';
+            return;
+        }
+        
+        const compatibilityInfo = {
+            'openai': '🌐 OpenAI 兼容 API - 支持 GPT 系列模型，使用标准的 OpenAI API 格式',
+            'anthropic': '🤖 Anthropic 兼容 API - 支持 Claude 系列模型，使用 Anthropic API 格式',
+            'google': '🔍 Google 兼容 API - 支持 Gemini 系列模型，使用 Google AI API 格式',
+            'azure': '☁️ Azure OpenAI 兼容 API - 使用 Azure OpenAI 服务格式，需要额外的 deployment 参数',
+            'cohere': '📝 Cohere 兼容 API - 支持 Command 系列模型，使用 Cohere API 格式',
+            'groq': '⚡ Groq 兼容 API - 高速推理服务，使用 Groq API 格式',
+            'mistral': '🌫️ Mistral 兼容 API - 支持 Mistral AI 模型，使用 Mistral API 格式',
+            'together': '🔗 Together AI 兼容 API - 支持多种开源模型，使用 Together AI API 格式',
+            'other': '🔧 其他兼容 API - 其他自定义 API 格式，请确保与 LiteLLM 兼容'
+        };
+        
+        infoDiv.innerHTML = compatibilityInfo[compatibility] || '';
+    }
+    
+    function onStandardProviderChange() {
+        const provider = document.getElementById('pf-provider').value;
+        const infoDiv = document.getElementById('pf-provider-info');
+        
+        if (!provider) {
+            infoDiv.innerHTML = '';
+            return;
+        }
+        
+        // 显示提供商信息
+        const providerInfo = {
+            'openai': 'OpenAI 官方 API，支持 GPT 系列模型<br>API Base: https://api.openai.com/v1',
+            'anthropic': 'Anthropic 官方 API，支持 Claude 系列模型<br>API Base: https://api.anthropic.com',
+            'google': 'Google 官方 API，支持 Gemini 系列模型<br>API Base: https://generativelanguage.googleapis.com',
+            'azure': 'Azure OpenAI 服务<br>API Base: 由 Azure 提供',
+            'cohere': 'Cohere 官方 API，支持 Command 系列模型<br>API Base: https://api.cohere.ai/v1',
+            'groq': 'Groq 高性能推理 API<br>API Base: https://api.groq.com/openai/v1',
+            'mistralai': 'Mistral AI 官方 API<br>API Base: https://api.mistral.ai/v1',
+            'perplexity': 'Perplexity AI 搜索增强 API<br>API Base: https://api.perplexity.ai'
+        };
+        
+        infoDiv.innerHTML = providerInfo[provider] || '标准 LiteLLM 提供商';
+    }
+
+    async function loadStandardProviders() {
+        const data = await api('/models/providers');
+        const sel = document.getElementById('pf-provider');
+        sel.innerHTML = '<option value="">选择标准提供商...</option>';
+        
+        for (const [name, info] of Object.entries(data.providers || {})) {
+            if (info.type === 'standard') {
+                sel.innerHTML += `<option value="${name}">${name} (${info.chat} 聊天模型)</option>`;
+            }
+        }
+    }
+
+    async function saveProvider() {
+        const type = document.getElementById('pf-type').value;
+        
+        if (!type) {
+            toast('请选择渠道类型');
+            return;
+        }
+        
+        const config = { type };
+        
+        if (type === 'standard') {
+            const provider = document.getElementById('pf-provider').value;
+            const apiKey = document.getElementById('pf-standard-api-key').value.trim();
+            const apiKeyEnv = document.getElementById('pf-standard-api-key-env').value.trim();
+            
+            if (!provider) {
+                toast('请选择标准提供商');
+                return;
+            }
+            
+            if (!apiKey && !apiKeyEnv) {
+                toast('请填写 API Key 或 API Key 环境变量名（至少一个）');
+                return;
+            }
+            
+            config.provider = provider;
+            config.api_key = apiKey;
+            config.api_key_env = apiKeyEnv;
+            
+        } else if (type === 'custom') {
+            const name = document.getElementById('pf-name').value.trim();
+            const compatibility = document.getElementById('pf-compatibility').value;
+            const apiBase = document.getElementById('pf-custom-api-base').value.trim();
+            const apiBaseEnv = document.getElementById('pf-custom-api-base-env').value.trim();
+            const apiKey = document.getElementById('pf-custom-api-key').value.trim();
+            const apiKeyEnv = document.getElementById('pf-custom-api-key-env').value.trim();
+            const description = document.getElementById('pf-description').value.trim();
+            
+            if (!name) {
+                toast('请填写渠道名称');
+                return;
+            }
+            
+            if (!compatibility) {
+                toast('请选择兼容类型');
+                return;
+            }
+            
+            // API Base 配置（二选一）
+            if (!apiBase && !apiBaseEnv) {
+                toast('请填写 API Base URL 或 API Base 环境变量名（至少一个）');
+                return;
+            }
+            
+            // API Key 配置（二选一）
+            if (!apiKey && !apiKeyEnv) {
+                toast('请填写 API Key 或 API Key 环境变量名（至少一个）');
+                return;
+            }
+            
+            config.name = name;
+            config.provider = 'custom';
+            config.compatibility_type = compatibility;
+            config.api_base = apiBase;
+            config.api_base_env = apiBaseEnv;
+            config.api_key = apiKey;
+            config.api_key_env = apiKeyEnv;
+            config.description = description;
+        }
+        
+        // 显示保存中状态
+        const saveBtn = document.querySelector('button[onclick="saveProvider()"]');
+        const originalText = saveBtn.textContent;
+        
+        // 添加加载动效
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>保存中...</span>';
+        
+        try {
+            // 先测试连接
+            const testResult = await api('/providers/test', { method: 'POST', body: config });
+            
+            if (testResult.success) {
+                // 测试通过，保存配置
+                await api('/providers/config', { method: 'POST', body: config });
+                hideProviderForm();
+                loadProviders();
+                
+                let successMsg = `✅ 渠道已保存`;
+                if (testResult.available_models) {
+                    successMsg += ` (可用模型: ${testResult.available_models})`;
+                }
+                toast(successMsg, 'success');
+            } else {
+                // 测试失败，显示持续的错误信息
+                let suggestion = '';
+                if (testResult.error_type === 'env_var_missing') {
+                    suggestion = '💡 请检查环境变量配置';
+                } else if (testResult.error_type === 'connection_error') {
+                    suggestion = '💡 请检查网络连接和 API 地址';
+                } else if (testResult.error_type === 'timeout') {
+                    suggestion = '💡 请检查网络连接';
+                } else if (testResult.error_type === 'auth_failed') {
+                    suggestion = '💡 请检查 API Key 是否正确';
+                } else if (testResult.error_type === 'rate_limit') {
+                    suggestion = '💡 API 调用频率限制，请稍后重试';
+                } else if (testResult.error_type === 'json_parse_error') {
+                    suggestion = '💡 API 响应格式不正确，请检查 API 地址是否正确';
+                } else {
+                    suggestion = '💡 请检查配置信息并重试';
+                }
+                
+                showProviderError(testResult.error, suggestion);
+            }
+        } catch (error) {
+            toast(`❌ 操作失败: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    async function deleteProvider(name) {
+        if (!confirm(`确认删除渠道 "${name}"?`)) return;
+        await api(`/providers/config/${name}`, { method: 'DELETE' });
+        loadProviders();
+        toast('渠道已删除');
+    }
+
+    async function loadProviderModels(name) {
+        try {
+            const data = await api(`/providers/${name}/models`);
+            if (data.error) {
+                toast(`获取模型失败: ${data.error}`);
+                return;
+            }
+            
+            let modelList = data.models || [];
+            if (modelList.length > 10) {
+                modelList = modelList.slice(0, 10);
+                toast(`显示前10个模型，共${data.total}个`);
+            }
+            
+            const modelNames = modelList.map(m => m.id).join(', ');
+            alert(`${name} 可用模型:\n\n${modelNames}`);
+            
+        } catch (e) {
+            toast(`获取模型失败: ${e.message}`);
+        }
+    }
+
+    // ===== Models =====
+    async function loadModels() {
+        const models = await api('/models');
+        const providers = await api('/providers/config');
+        const tb = document.getElementById('models-table');
+        tb.innerHTML = '';
+        
+        for (const [key, c] of Object.entries(models)) {
+            const opts = [];
+            if (c.enable_search) opts.push('搜索');
+            if (c.enable_reasoning) opts.push('推理');
+            if (c.stream === false) opts.push('非流式');
+            const envVars = [];
+            if (c.api_key_env) envVars.push(`Key: ${c.api_key_env}`);
+            if (c.api_base_env) envVars.push(`Base: ${c.api_base_env}`);
+            
+            // 获取模型类别（异步）
+            const modelCategory = await getModelCategory(c.model || '');
+            
+            // 获取API渠道信息
+            let providerInfo = '';
+            if (c.provider) {
+                const provider = providers[c.provider];
+                if (provider) {
+                    if (provider.type === 'custom' || provider.provider === 'custom') {
+                        providerInfo = `🔧 ${c.provider}`;
+                    } else {
+                        providerInfo = `🌐 ${c.provider}`;
+                    }
+                } else {
+                    providerInfo = c.provider;
+                }
+            } else if (c.model && c.model.includes('/')) {
+                // 从模型标识符中提取提供商
+                const providerName = c.model.split('/')[0];
+                const provider = providers[providerName];
+                if (provider) {
+                    if (provider.type === 'custom' || provider.provider === 'custom') {
+                        providerInfo = `🔧 ${providerName}`;
+                    } else {
+                        providerInfo = `🌐 ${providerName}`;
+                    }
+                } else {
+                    providerInfo = `🌐 ${providerName}`;
+                }
+            } else {
+                providerInfo = '自动';
+            }
+            
+            tb.innerHTML += `<tr>
+                <td class="px-3 py-3 font-medium text-sm">${key}</td>
+                <td class="px-3 py-3"><span class="badge badge-green text-xs">${modelCategory}</span></td>
+                <td class="px-3 py-3 font-mono text-xs break-all">${c.model || '?'}</td>
+                <td class="px-3 py-3 text-xs">${providerInfo}</td>
+                <td class="px-3 py-3 text-xs">${envVars.length ? envVars.join(', ') : '自动'}</td>
+                <td class="px-3 py-3">${opts.length ? opts.map(o => `<span class="badge badge-gray text-xs">${o}</span>`).join(' ') : '-'}</td>
+                <td class="px-3 py-3">
+                    <button onclick="editModel('${key}')" class="text-blue-500 hover:text-blue-700 text-xs mr-2 whitespace-nowrap">编辑</button>
+                    <button onclick="deleteModel('${key}')" class="text-red-500 hover:text-red-700 text-xs whitespace-nowrap">删除</button>
+                </td>
+            </tr>`;
+        }
+    }
+
+    function showModelForm() { 
+        document.getElementById('model-form').classList.remove('hidden');
+        loadModelProviders();
+        // 初始化ID生成状态
+        modelIdAutoMode = true;
+        document.getElementById('mf-key-mode-icon').textContent = '🔄';
+        document.getElementById('mf-key-hint').textContent = '💡 自动生成模型ID';
+        document.getElementById('mf-key').style.backgroundColor = '';
+    }
+    
+    function hideModelForm() { 
+        document.getElementById('model-form').classList.add('hidden');
+        
+        // 重置表单状态
+        const saveBtn = document.querySelector('button[onclick*="updateModel"], button[onclick="saveModel()"]');
+        if (saveBtn) {
+            saveBtn.textContent = '保存';
+            saveBtn.setAttribute('onclick', 'saveModel()');
+        }
+        
+        // 清空表单
+        document.getElementById('mf-key').value = '';
+        document.getElementById('mf-provider').value = '';
+        document.getElementById('mf-model-input').value = '先选择渠道...';
+        selectedModel = '';
+        document.getElementById('mf-search').checked = false;
+        document.getElementById('mf-reasoning').checked = false;
+        document.getElementById('mf-no-stream').checked = false;
+        
+        // 隐藏加载提示
+        document.getElementById('mf-loading-hint').style.display = 'none';
+        
+        // 重置ID生成状态
+        modelIdAutoMode = true;
+        document.getElementById('mf-key-mode-icon').textContent = '🔄';
+        document.getElementById('mf-key-hint').textContent = '💡 选择渠道和模型后会自动生成模型ID';
+        document.getElementById('mf-key').style.backgroundColor = '';
+        
+        // 清空自定义下拉框
+        loadCustomModelOptions([]);
+        
+        // 关闭下拉框
+        if (isDropdownOpen) {
+            toggleModelDropdown();
+        }
+    }
+
+    async function editModel(key) {
+        try {
+            // 获取模型配置
+            const models = await api('/models');
+            const modelConfig = models[key];
+            
+            if (!modelConfig) {
+                toast('模型不存在');
+                return;
+            }
+            
+            // 先加载渠道列表（不显示表单）
+            await loadModelProviders();
+            
+            // 填充表单数据
+            document.getElementById('mf-key').value = key;
+            // 移除type字段设置，默认使用litellm
+            
+            // 设置渠道选择
+            if (modelConfig.provider) {
+                // 确保渠道选项已加载
+                const providerSelect = document.getElementById('mf-provider');
+                providerSelect.value = modelConfig.provider;
+                
+                // 触发渠道变化事件来加载模型列表
+                await onProviderSelectChange(modelConfig.model);
+            }
+            
+            // 设置选项（保持原有状态）
+            document.getElementById('mf-search').checked = modelConfig.enable_search || false;
+            document.getElementById('mf-reasoning').checked = modelConfig.enable_reasoning || false;
+            document.getElementById('mf-no-stream').checked = modelConfig.stream === false;
+            
+            // 编辑模式下切换到手动模式
+            modelIdAutoMode = false;
+            document.getElementById('mf-key-mode-icon').textContent = '✏️';
+            document.getElementById('mf-key-hint').textContent = '✏️ 编辑模式，可修改模型ID';
+            document.getElementById('mf-key').style.backgroundColor = '#fffbeb';
+            
+            // 修改保存按钮为更新模式
+            const saveBtn = document.querySelector('button[onclick="saveModel()"]');
+            saveBtn.textContent = '更新';
+            saveBtn.setAttribute('onclick', `updateModel('${key}')`);
+            
+            // 最后显示表单
+            document.getElementById('model-form').classList.remove('hidden');
+            
+        } catch (error) {
+            toast(`编辑失败: ${error.message}`, 'error');
+        }
+    }
+
+    async function updateModel(originalKey) {
+        const key = document.getElementById('mf-key').value.trim();
+        const provider = document.getElementById('mf-provider').value;
+        const modelId = selectedModel; // 使用自定义下拉框的选中值
+        
+        if (!key || !provider || !modelId) { 
+            toast('请填写模型 ID、选择渠道和模型'); 
+            return; 
+        }
+        
+        const config = {
+            type: document.getElementById('mf-type').value,
+            model: modelId,
+            provider: provider,
+        };
+        
+        // 如果是自定义渠道，需要从渠道配置中获取环境变量信息
+        if (provider.startsWith('custom_') || !['openai', 'anthropic', 'google', 'azure'].includes(provider)) {
+            // 对于自定义渠道，尝试从配置中获取环境变量
+            try {
+                const providers = await api('/providers/config');
+                const providerConfig = providers[provider];
+                if (providerConfig) {
+                    config.api_base_env = providerConfig.api_base_env;
+                    config.api_key_env = providerConfig.api_key_env;
+                }
+            } catch (e) {
+                console.warn('获取渠道配置失败:', e);
+            }
+        }
+        
+        if (document.getElementById('mf-search').checked) config.enable_search = true;
+        if (document.getElementById('mf-reasoning').checked) config.enable_reasoning = true;
+        if (document.getElementById('mf-no-stream').checked) config.stream = false;
+        
+        // 如果key改变了，先删除旧的
+        if (key !== originalKey) {
+            await api(`/models/${originalKey}`, { method: 'DELETE' });
+        }
+        
+        await api('/models', { method: 'POST', body: { key, config } });
+        hideModelForm(); 
+        loadModels(); 
+        toast('模型已更新');
+    }
+    
+    async function loadModelProviders() {
+        const configProviders = await api('/providers/config');
+        
+        const sel = document.getElementById('mf-provider');
+        sel.innerHTML = '<option value="">选择 API 渠道...</option>';
+        
+        // 只显示已配置的渠道
+        for (const [name, info] of Object.entries(configProviders)) {
+            if (info.type === 'custom' || info.provider === 'custom') {
+                sel.innerHTML += `<option value="${name}">🔧 ${name} (自定义渠道)</option>`;
+            } else {
+                sel.innerHTML += `<option value="${name}">🌐 ${name} (标准渠道)</option>`;
+            }
+        }
+    }
+    
+    async function onProviderSelectChange(editModeModel = null) {
+        const provider = document.getElementById('mf-provider').value;
+        const modelInput = document.getElementById('mf-model-input');
+        const loadingHint = document.getElementById('mf-loading-hint');
+        
+        if (!provider) {
+            modelInput.disabled = true;
+            modelInput.value = '先选择渠道...';
+            selectedModel = '';
+            loadCustomModelOptions([]);
+            loadingHint.style.display = 'none';
+            return;
+        }
+        
+        modelInput.disabled = false;
+        modelInput.value = '加载中...';
+        loadingHint.style.display = 'block';
+        
+        try {
+            const data = await api(`/providers/${provider}/models`);
+            const models = data.models || [];
+            
+            // 使用自定义下拉框加载选项
+            loadCustomModelOptions(models);
+            
+            // 隐藏加载提示
+            loadingHint.style.display = 'none';
+            
+            // 如果是编辑模式，自动选择原有模型
+            if (editModeModel) {
+                selectModelOption(editModeModel);
+                // 如果原有模型不在列表中，添加它
+                if (!selectedModel && editModeModel) {
+                    const optionsContainer = document.getElementById('mf-model-options');
+                    const option = document.createElement('div');
+                    option.className = 'dropdown-option selected';
+                    option.dataset.modelId = editModeModel;
+                    option.textContent = editModeModel;
+                    option.onclick = () => selectModelOption(editModeModel);
+                    optionsContainer.appendChild(option);
+                    selectModelOption(editModeModel);
+                }
+                // 编辑模式下不自动生成ID
+                return;
+            }
+            
+            // 自动生成模型ID
+            generateModelId();
+            
+        } catch (e) {
+            modelInput.value = '加载失败';
+            loadCustomModelOptions([]);
+            loadingHint.style.display = 'none';
+            toast(`加载模型失败: ${e.message}`);
+        }
+    }
+    
+    // 智能模型ID生成相关变量
+    let modelIdAutoMode = true;
+    let originalModelId = '';
+    
+    function toggleModelIdMode() {
+        const keyInput = document.getElementById('mf-key');
+        const modeIcon = document.getElementById('mf-key-mode-icon');
+        const hint = document.getElementById('mf-key-hint');
+        
+        modelIdAutoMode = !modelIdAutoMode;
+        
+        if (modelIdAutoMode) {
+            // 切换到自动生成模式
+            modeIcon.textContent = '🔄';
+            hint.textContent = '💡 选择渠道和模型后会自动生成模型ID';
+            keyInput.readOnly = false;
+            keyInput.style.backgroundColor = '';
+            generateModelId();
+        } else {
+            // 切换到手动输入模式
+            modeIcon.textContent = '✏️';
+            hint.textContent = '✏️ 手动输入模式，请输入自定义模型ID';
+            keyInput.readOnly = false;
+            keyInput.style.backgroundColor = '#fffbeb';
+            keyInput.focus();
+        }
+    }
+    
+    function generateModelId() {
+        if (!modelIdAutoMode) return;
+        
+        const provider = document.getElementById('mf-provider').value;
+        const modelName = selectedModel; // 使用自定义下拉框的选中值
+        const keyInput = document.getElementById('mf-key');
+        
+        if (!provider || !modelName) {
+            keyInput.value = '';
+            return;
+        }
+        
+        // 智能ID生成策略
+        let generatedId = '';
+        
+        // 根据渠道类型生成不同的ID格式
+        if (provider === 'openai') {
+            // OpenAI: 使用简化的模型名
+            generatedId = modelName.replace(/^openai\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else if (provider === 'anthropic') {
+            // Anthropic: claude-系列
+            generatedId = modelName.replace(/^anthropic\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else if (provider === 'google') {
+            // Google: gemini-系列
+            generatedId = modelName.replace(/^google\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else {
+            // 其他渠道: 渠道名/模型名的简化格式
+            const providerPrefix = provider.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+            const modelSuffix = modelName.replace(/^.*\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+            generatedId = `${providerPrefix}/${modelSuffix}`;
+        }
+        
+        // 确保ID不为空且长度合理
+        if (generatedId.length > 50) {
+            generatedId = generatedId.substring(0, 47) + '...';
+        }
+        
+        keyInput.value = generatedId;
+    }
+    
+    function onModelIdChange() {
+        // 用户手动修改了模型ID，切换到手动模式
+        if (modelIdAutoMode && document.getElementById('mf-key').value !== '') {
+            const currentValue = document.getElementById('mf-key').value;
+            const expectedValue = getExpectedModelId();
+            
+            if (currentValue !== expectedValue) {
+                modelIdAutoMode = false;
+                document.getElementById('mf-key-mode-icon').textContent = '✏️';
+                document.getElementById('mf-key-hint').textContent = '✏️ 手动输入模式，请输入自定义模型ID';
+                document.getElementById('mf-key').style.backgroundColor = '#fffbeb';
+            }
+        }
+    }
+    
+    async function getModelCategory(modelName) {
+        // 使用后端API获取模型类型信息
+        try {
+            const typeInfo = await api(`/models/type-info?model_name=${encodeURIComponent(modelName)}`);
+            return typeInfo.category || '💬 对话模型';
+        } catch (error) {
+            console.warn('获取模型类型信息失败:', error);
+            // 回退到前端检测
+            return fallbackGetModelCategory(modelName);
+        }
+    }
+    
+    function fallbackGetModelCategory(modelName) {
+        // 前端备用检测方法
+        if (modelName.includes('gpt') || modelName.includes('chat')) {
+            return '💬 对话模型';
+        } else if (modelName.includes('claude')) {
+            return '🧠 对话模型';
+        } else if (modelName.includes('gemini')) {
+            return '🔍 多模态模型';
+        } else if (modelName.includes('ernie') || modelName.includes('wenxin')) {
+            return '💬 对话模型';
+        } else if (modelName.includes('qwen')) {
+            return '💬 对话模型';
+        } else if (modelName.includes('embedding') || modelName.includes('embed')) {
+            return '📊 嵌入模型';
+        } else if (modelName.includes('image') || modelName.includes('dall') || modelName.includes('stable-diffusion')) {
+            return '🎨 图像生成';
+        } else if (modelName.includes('whisper') || modelName.includes('tts') || modelName.includes('speech')) {
+            return '🔊 语音模型';
+        } else if (modelName.includes('code') || modelName.includes('codex')) {
+            return '💻 代码模型';
+        } else if (modelName.includes('translate') || modelName.includes('translation')) {
+            return '🌐 翻译模型';
+        } else {
+            return '🤖 通用模型';
+        }
+    }
+    
+    function onModelNameChange() {
+        generateModelId();
+        detectModelType();
+    }
+    
+    async function detectModelType() {
+        // 模型类型检测已隐藏，保留函数以避免错误
+        // 如果需要，可以在控制台记录模型类型信息用于调试
+        const modelName = document.getElementById('mf-model').value;
+        if (modelName) {
+            try {
+                const typeInfo = await api(`/models/type-info?model_name=${encodeURIComponent(modelName)}`);
+                console.log(`模型 ${modelName} 类型:`, typeInfo.category);
+            } catch (error) {
+                // 静默处理错误
+            }
+        }
+    }
+    
+    async function fallbackModelTypeDetection(modelName, provider, typeDisplay) {
+        // 前端备用检测方法
+        let modelCategory = '';
+        
+        if (modelName.includes('gpt') || modelName.includes('chat')) {
+            modelCategory = '💬 对话模型';
+        } else if (modelName.includes('claude')) {
+            modelCategory = '🧠 对话模型';
+        } else if (modelName.includes('gemini')) {
+            modelCategory = '🔍 多模态模型';
+        } else if (modelName.includes('ernie') || modelName.includes('wenxin')) {
+            modelCategory = '💬 对话模型';
+        } else if (modelName.includes('qwen')) {
+            modelCategory = '💬 对话模型';
+        } else if (modelName.includes('embedding') || modelName.includes('embed')) {
+            modelCategory = '📊 嵌入模型';
+        } else if (modelName.includes('image') || modelName.includes('dall') || modelName.includes('stable-diffusion')) {
+            modelCategory = '🎨 图像生成';
+        } else if (modelName.includes('whisper') || modelName.includes('tts') || modelName.includes('speech')) {
+            modelCategory = '🔊 语音模型';
+        } else if (modelName.includes('code') || modelName.includes('codex')) {
+            modelCategory = '💻 代码模型';
+        } else if (modelName.includes('translate') || modelName.includes('translation')) {
+            modelCategory = '🌐 翻译模型';
+        } else {
+            modelCategory = '🤖 通用模型';
+        }
+        
+        let providerInfo = '';
+        if (provider) {
+            if (provider === 'openai') {
+                providerInfo = ' (OpenAI)';
+            } else if (provider === 'anthropic') {
+                providerInfo = ' (Anthropic)';
+            } else if (provider === 'google') {
+                providerInfo = ' (Google)';
+            } else {
+                providerInfo = ` (${provider})`;
+            }
+        }
+        
+        typeDisplay.textContent = `${modelCategory}${providerInfo}`;
+    }
+    
+    function getExpectedModelId() {
+        const provider = document.getElementById('mf-provider').value;
+        const modelName = selectedModel; // 使用自定义下拉框的选中值
+        
+        if (!provider || !modelName) return '';
+        
+        if (provider === 'openai') {
+            return modelName.replace(/^openai\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else if (provider === 'anthropic') {
+            return modelName.replace(/^anthropic\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else if (provider === 'google') {
+            return modelName.replace(/^google\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+        } else {
+            const providerPrefix = provider.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+            const modelSuffix = modelName.replace(/^.*\//, '').replace(/[^a-zA-Z0-9\-_.]/g, '-').toLowerCase();
+            return `${providerPrefix}/${modelSuffix}`;
+        }
+    }
+    
+    // ===== 自定义下拉框功能 =====
+    let selectedModel = '';
+    let isDropdownOpen = false;
+    
+    function toggleModelDropdown() {
+        const dropdown = document.getElementById('mf-model-options');
+        const arrow = document.querySelector('.dropdown-arrow');
+        
+        if (isDropdownOpen) {
+            dropdown.style.display = 'none';
+            arrow.classList.remove('open');
+            isDropdownOpen = false;
+        } else {
+            dropdown.style.display = 'block';
+            arrow.classList.add('open');
+            isDropdownOpen = true;
+            
+            // 智能定位：确保下拉框不超出视窗
+            const dropdownRect = dropdown.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - dropdownRect.top - 10; // 留10px边距
+            
+            if (dropdownRect.height > spaceBelow) {
+                // 如果下方空间不够，向上展开
+                dropdown.style.bottom = '100%';
+                dropdown.style.top = 'auto';
+                dropdown.style.marginTop = '0';
+                dropdown.style.marginBottom = '0.25rem';
+                
+                // 检查上方空间
+                const spaceAbove = dropdownRect.top - 10;
+                if (dropdownRect.height > spaceAbove) {
+                    // 如果上下都不够，限制高度并滚动
+                    dropdown.style.maxHeight = Math.min(spaceAbove, spaceBelow, 250) + 'px';
+                    dropdown.style.overflowY = 'auto';
+                }
+            } else {
+                // 下方空间足够，向下展开
+                dropdown.style.top = '100%';
+                dropdown.style.bottom = 'auto';
+                dropdown.style.marginTop = '0.25rem';
+                dropdown.style.marginBottom = '0';
+                dropdown.style.maxHeight = Math.min(spaceBelow, 250) + 'px';
+                dropdown.style.overflowY = 'auto';
+            }
+        }
+    }
+    
+    function selectModelOption(modelId) {
+        selectedModel = modelId;
+        document.getElementById('mf-model-input').value = modelId;
+        
+        // 更新选中状态
+        const options = document.querySelectorAll('.dropdown-option');
+        options.forEach(opt => {
+            opt.classList.remove('selected');
+            if (opt.dataset.modelId === modelId) {
+                opt.classList.add('selected');
+            }
+        });
+        
+        // 关闭下拉框
+        toggleModelDropdown();
+        
+        // 触发模型变化事件
+        onModelNameChange();
+    }
+    
+    // 点击外部关闭下拉框
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('mf-model-dropdown');
+        if (!dropdown.contains(event.target) && isDropdownOpen) {
+            toggleModelDropdown();
+        }
+    });
+    
+    // 自定义下拉框选项加载函数
+    function loadCustomModelOptions(models) {
+        const optionsContainer = document.getElementById('mf-model-options');
+        optionsContainer.innerHTML = '';
+        
+        if (models.length === 0) {
+            optionsContainer.innerHTML = '<div class="dropdown-option text-gray-500">无可用模型</div>';
+            return;
+        }
+        
+        models.forEach(m => {
+            const option = document.createElement('div');
+            option.className = 'dropdown-option';
+            option.dataset.modelId = m.id;
+            option.textContent = m.id.length > 50 ? m.id.substring(0, 47) + '...' : m.id;
+            option.onclick = () => selectModelOption(m.id);
+            optionsContainer.appendChild(option);
+        });
+    }
+    
+    // 获取当前选中的模型值
+    function getSelectedModel() {
+        return selectedModel;
+    }
+    
+    async function refreshProviderModels() {
+        const provider = document.getElementById('mf-provider').value;
+        if (!provider) {
+            toast('请先选择渠道');
+            return;
+        }
+        await onProviderSelectChange();
+        toast('模型列表已刷新');
+    }
+
+    async function saveModel() {
+        const key = document.getElementById('mf-key').value.trim();
+        const provider = document.getElementById('mf-provider').value;
+        const modelId = selectedModel; // 使用自定义下拉框的选中值
+        
+        if (!key || !provider || !modelId) { 
+            toast('请填写模型 ID、选择渠道和模型'); 
+            return; 
+        }
+        
+        const config = {
+            type: 'litellm',  // 默认使用litellm类型
+            model: modelId,
+            provider: provider,  // 保存渠道信息
+        };
+        
+        // 如果是自定义渠道，需要从渠道配置中获取环境变量信息
+        if (provider.startsWith('custom_') || !['openai', 'anthropic', 'google', 'azure'].includes(provider)) {
+            // 对于自定义渠道，尝试从配置中获取环境变量
+            try {
+                const providers = await api('/providers/config');
+                const providerConfig = providers[provider];
+                if (providerConfig) {
+                    config.api_base_env = providerConfig.api_base_env;
+                    config.api_key_env = providerConfig.api_key_env;
+                }
+            } catch (e) {
+                console.warn('获取渠道配置失败:', e);
+            }
+        }
+        
+        if (document.getElementById('mf-search').checked) config.enable_search = true;
+        if (document.getElementById('mf-reasoning').checked) config.enable_reasoning = true;
+        if (document.getElementById('mf-no-stream').checked) config.stream = false;
+        
+        await api('/models', { method: 'POST', body: { key, config } });
+        hideModelForm(); 
+        loadModels(); 
+        toast('模型已保存');
+    }
+
+    async function deleteModel(key) {
+        if (!confirm(`确认删除模型 "${key}"?`)) return;
+        try {
+            await api(`/models/${key}`, { method: 'DELETE' });
+            loadModels(); 
+            toast('模型已删除');
+        } catch (error) {
+            const errorMsg = error.message;
+            if (errorMsg.includes('以下快捷键正在使用它')) {
+                // 409冲突错误：显示更详细的错误信息
+                toast(`⚠️ ${errorMsg}`, 5000); // 显示更长时间
+            } else {
+                toast(`删除失败: ${errorMsg}`);
+            }
+        }
+    }
+
+    // ===== Model Search =====
+    function searchModels() {
+        document.getElementById('model-search-modal').classList.remove('hidden');
+        loadSearchProviders();
+    }
+
+    function hideSearchModels() {
+        document.getElementById('model-search-modal').classList.add('hidden');
+    }
+
+    async function loadSearchProviders() {
+        const data = await api('/models/providers');
+        const sel = document.getElementById('ms-provider');
+        sel.innerHTML = '<option value="">所有提供商</option>';
+        
+        // 添加标准提供商
+        for (const [name, info] of Object.entries(data.providers || {})) {
+            const type = info.type === 'custom' ? '🔧 自定义' : '🌐 标准';
+            sel.innerHTML += `<option value="${name}">${name} (${info.chat} 聊天模型) ${type}</option>`;
+        }
+    }
+
+    async function doSearchModels() {
+        const query = document.getElementById('ms-query').value.trim();
+        const provider = document.getElementById('ms-provider').value;
+        const limit = parseInt(document.getElementById('ms-limit').value) || 20;
+        const results = document.getElementById('ms-results');
+        results.innerHTML = '';
+        
+        // 检查是否为自定义渠道
+        if (provider && provider.startsWith('custom_')) {
+            try {
+                const data = await api(`/models/custom/${provider}`);
+                if (data.error) {
+                    results.innerHTML = `<div class="text-red-500 p-4">错误: ${data.error}<br>请检查环境变量 ${data.api_base_env} 和 ${data.api_key_env}</div>`;
+                    return;
+                }
+                
+                // 过滤模型
+                let models = data.models || [];
+                if (query) {
+                    const q = query.toLowerCase();
+                    models = models.filter(m => m.id.toLowerCase().includes(q));
+                }
+                if (limit && models.length > limit) {
+                    models = models.slice(0, limit);
+                }
+                
+                models.forEach(m => {
+                    results.innerHTML += `<div class="p-2 border rounded hover:bg-gray-50 cursor-pointer" onclick="selectCustomModel('${m.id}', '${provider}')">
+                        <div class="font-medium text-sm">${m.id}</div>
+                        <div class="text-xs text-gray-500">🔧 ${provider} • OpenAI 兼容</div>
+                    </div>`;
+                });
+                
+                if (models.length === 0) {
+                    results.innerHTML = '<div class="text-gray-500 text-center p-4">未找到匹配的模型</div>';
+                }
+                
+            } catch (e) {
+                results.innerHTML = `<div class="text-red-500 p-4">获取自定义渠道模型失败: ${e.message}</div>`;
+            }
+        } else {
+            // 标准 litellm 搜索
+            const params = new URLSearchParams({ q: query, limit });
+            if (provider) params.set('provider', provider);
+            const data = await api(`/models/available?${params}`);
+            
+            data.models.forEach(m => {
+                const features = [];
+                if (m.supports_vision) features.push('视觉');
+                if (m.supports_function_calling) features.push('工具');
+                results.innerHTML += `<div class="p-2 border rounded hover:bg-gray-50 cursor-pointer" onclick="selectModel('${m.model}')">
+                    <div class="font-medium text-sm">${m.model}</div>
+                    <div class="text-xs text-gray-500">${m.provider} • ${m.max_input_tokens || '-'} 上下文 ${features.length ? '• ' + features.join(', ') : ''}</div>
+                </div>`;
+            });
+            
+            if (data.models.length === 0) {
+                results.innerHTML = '<div class="text-gray-500 text-center p-4">未找到匹配的模型</div>';
+            }
+        }
+    }
+
+    function selectModel(modelId) {
+        selectModelOption(modelId);
+        hideSearchModels();
+        toast(`已选择模型: ${modelId}`);
+    }
+
+    function selectCustomModel(modelId, provider) {
+        // 对于自定义渠道，需要使用 openai/ 前缀格式
+        const customModelId = `openai/${modelId}`;
+        selectModelOption(customModelId);
+        
+        // 自动设置类型为 litellm
+        document.getElementById('mf-type').value = 'litellm';
+        
+        hideSearchModels();
+        toast(`已选择自定义渠道模型: ${customModelId}`);
+    }
+
+    // ===== Roles =====
+    async function loadRoles() {
+        const [roles, models, prompts] = await Promise.all([
+            api('/roles'),
+            api('/models'),
+            api('/prompts')
+        ]);
+        
+        const tb = document.getElementById('roles-table');
+        tb.innerHTML = '';
+        for (const [key, c] of Object.entries(roles)) {
+            tb.innerHTML += `<tr>
+                <td class="px-4 py-3 font-medium">${key}</td>
+                <td class="px-4 py-3">${c.base_model || '?'}</td>
+                <td class="px-4 py-3">${c.prompt_key || '?'}</td>
+                <td class="px-4 py-3"><button onclick="deleteRole('${key}')" class="text-red-500 hover:text-red-700 text-xs">删除</button></td>
+            </tr>`;
+        }
+    }
+
+    function showRoleForm() { 
+        document.getElementById('role-form').classList.remove('hidden');
+        loadRoleOptions();
+    }
+    
+    function hideRoleForm() { document.getElementById('role-form').classList.add('hidden'); }
+    
+    async function loadRoleOptions() {
+        const [models, prompts] = await Promise.all([
+            api('/models'),
+            api('/prompts')
+        ]);
+        
+        // 加载基础模型选项
+        const baseSel = document.getElementById('rf-base');
+        baseSel.innerHTML = '<option value="">选择基础模型...</option>';
+        for (const key of Object.keys(models)) {
+            baseSel.innerHTML += `<option value="${key}">${key}</option>`;
+        }
+        
+        // 加载 Prompt 选项
+        const promptSel = document.getElementById('rf-prompt');
+        promptSel.innerHTML = '<option value="">选择 Prompt...</option>';
+        for (const key of Object.keys(prompts)) {
+            promptSel.innerHTML += `<option value="${key}">${key}</option>`;
+        }
+    }
+
+    async function saveRole() {
+        const key = document.getElementById('rf-key').value.trim();
+        const baseModel = document.getElementById('rf-base').value;
+        const promptKey = document.getElementById('rf-prompt').value;
+        
+        if (!key || !baseModel || !promptKey) { 
+            toast('请填写角色 ID、选择基础模型和 Prompt'); 
+            return; 
+        }
+        
+        const config = {
+            base_model: baseModel,
+            prompt_key: promptKey,
+        };
+        await api('/roles', { method: 'POST', body: { key, config } });
+        hideRoleForm(); 
+        loadRoles(); 
+        toast('角色已保存');
+    }
+
+    async function deleteRole(key) {
+        if (!confirm(`确认删除角色 "${key}"?`)) return;
+        await api(`/roles/${key}`, { method: 'DELETE' });
+        loadRoles(); toast('角色已删除');
+    }
+
+    // ===== Prompts =====
+    async function loadPrompts() {
+        const prompts = await api('/prompts');
+        const list = document.getElementById('prompts-list');
+        list.innerHTML = '';
+        for (const [key, val] of Object.entries(prompts)) {
+            list.innerHTML += `<div class="card p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium text-sm">${key}</span>
+                    <button onclick="deletePrompt('${key}')" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                </div>
+                <p class="text-sm text-gray-600">${val}</p>
+            </div>`;
+        }
+    }
+
+    function showPromptForm() { document.getElementById('prompt-form').classList.remove('hidden'); }
+    function hidePromptForm() { document.getElementById('prompt-form').classList.add('hidden'); }
+
+    async function savePrompt() {
+        const key = document.getElementById('pf-key').value.trim();
+        const value = document.getElementById('pf-value').value.trim();
+        if (!key || !value) { toast('请填写 Key 和内容'); return; }
+        await api('/prompts', { method: 'POST', body: { key, value } });
+        hidePromptForm(); loadPrompts(); toast('Prompt 已保存');
+    }
+
+    async function deletePrompt(key) {
+        if (!confirm(`确认删除 Prompt "${key}"?`)) return;
+        await api(`/prompts/${key}`, { method: 'DELETE' });
+        loadPrompts(); toast('Prompt 已删除');
+    }
+
+    // ===== Hotkeys =====
+    async function loadHotkeys() {
+        const hotkeys = await api('/hotkeys');
+        const tb = document.getElementById('hotkeys-table');
+        tb.innerHTML = '';
+        for (const [key, c] of Object.entries(hotkeys)) {
+            tb.innerHTML += `<tr>
+                <td class="px-4 py-3"><kbd class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs font-mono dark:text-white dark:border-gray-600">${key}</kbd></td>
+                <td class="px-4 py-3"><span class="badge badge-blue">${c.action || '?'}</span></td>
+                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">${c.target || '-'}</td>
+                <td class="px-4 py-3">
+                    <button onclick="editHotkey('${key}')" class="text-blue-500 hover:text-blue-700 text-xs mr-2">编辑</button>
+                    <button onclick="deleteHotkey('${key}')" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                </td>
+            </tr>`;
+        }
+    }
+
+    function showHotkeyForm() { 
+        document.getElementById('hotkey-form').classList.remove('hidden');
+        onHotkeyActionChange(); // 初始化目标字段
+    }
+    
+    function onHotkeyActionChange() {
+        const action = document.getElementById('hf-action').value;
+        const container = document.getElementById('hf-target-container');
+        
+        if (action === 'chat') {
+            // 显示模型选择器
+            container.innerHTML = '<select id="hf-target" class="input"><option value="">选择模型...</option></select>';
+            loadModelsForHotkey();
+        } else if (action === 'role') {
+            // 显示角色选择器
+            container.innerHTML = '<select id="hf-target" class="input"><option value="">选择角色...</option></select>';
+            loadRolesForHotkey();
+        } else {
+            // cancel/reload/exit 等无需目标
+            container.innerHTML = '';
+        }
+    }
+    
+    async function loadModelsForHotkey() {
+        try {
+            const models = await api('/models');
+            const select = document.getElementById('hf-target');
+            select.innerHTML = '<option value="">选择模型...</option>';
+            
+            for (const [key, model] of Object.entries(models)) {
+                const displayName = model.model || key;
+                select.innerHTML += `<option value="${key}">${displayName}</option>`;
+            }
+        } catch (error) {
+            console.error('加载模型列表失败:', error);
+        }
+    }
+    
+    async function loadRolesForHotkey() {
+        try {
+            const roles = await api('/roles');
+            const select = document.getElementById('hf-target');
+            select.innerHTML = '<option value="">选择角色...</option>';
+            
+            for (const [key, role] of Object.entries(roles)) {
+                const displayName = role.name || key;
+                select.innerHTML += `<option value="${key}">${displayName}</option>`;
+            }
+        } catch (error) {
+            console.error('加载角色列表失败:', error);
+        }
+    }
+    
+    function hideHotkeyForm() { 
+        document.getElementById('hotkey-form').classList.add('hidden');
+        
+        // 重置表单状态
+        const saveBtn = document.querySelector('button[onclick*="updateHotkey"], button[onclick="saveHotkey()"]');
+        if (saveBtn) {
+            saveBtn.textContent = '保存';
+            saveBtn.setAttribute('onclick', 'saveHotkey()');
+        }
+        
+        // 清空表单
+        document.getElementById('hf-key').value = '';
+        document.getElementById('hf-action').value = '';
+        // 重置目标字段为默认状态
+        onHotkeyActionChange();
+    }
+
+    async function editHotkey(key) {
+        try {
+            // 获取快捷键配置
+            const hotkeys = await api('/hotkeys');
+            const hotkeyConfig = hotkeys[key];
+            
+            if (!hotkeyConfig) {
+                toast('快捷键不存在');
+                return;
+            }
+            
+            // 填充表单数据
+            document.getElementById('hf-key').value = key;
+            document.getElementById('hf-action').value = hotkeyConfig.action || '';
+            
+            // 显示表单（这会触发 onHotkeyActionChange 来创建正确的目标字段）
+            showHotkeyForm();
+            
+            // 延迟设置目标值，确保目标字段已创建
+            setTimeout(() => {
+                const targetElement = document.getElementById('hf-target');
+                if (targetElement) {
+                    targetElement.value = hotkeyConfig.target || '';
+                }
+            }, 100);
+            
+            // 修改保存按钮为更新模式
+            const saveBtn = document.querySelector('button[onclick="saveHotkey()"]');
+            saveBtn.textContent = '更新';
+            saveBtn.setAttribute('onclick', `updateHotkey('${key}')`);
+            
+        } catch (error) {
+            toast(`编辑失败: ${error.message}`, 'error');
+        }
+    }
+
+    async function updateHotkey(originalKey) {
+        const hotkey = document.getElementById('hf-key').value.trim();
+        const action = document.getElementById('hf-action').value;
+        const target = document.getElementById('hf-target').value.trim();
+        
+        if (!hotkey) { 
+            toast('请填写快捷键'); 
+            return; 
+        }
+        
+        // 如果快捷键改变了，先删除旧的
+        if (hotkey !== originalKey) {
+            await api(`/hotkeys/${originalKey}`, { method: 'DELETE' });
+        }
+        
+        await api('/hotkeys', { method: 'POST', body: { hotkey, action, target } });
+        hideHotkeyForm(); 
+        loadHotkeys(); 
+        toast('快捷键已更新');
+    }
+
+    async function saveHotkey() {
+        const hotkey = document.getElementById('hf-key').value.trim();
+        const action = document.getElementById('hf-action').value;
+        const target = document.getElementById('hf-target').value.trim();
+        if (!hotkey) { toast('请填写快捷键'); return; }
+        await api('/hotkeys', { method: 'POST', body: { hotkey, action, target } });
+        hideHotkeyForm(); loadHotkeys(); toast('快捷键已保存');
+    }
+
+    async function deleteHotkey(key) {
+        if (!confirm(`确认删除快捷键 "${key}"?`)) return;
+        await api(`/hotkeys/${key}`, { method: 'DELETE' });
+        loadHotkeys(); toast('快捷键已删除');
+    }
+
+    // ===== Environment Check =====
+    async function loadEnvCheck() {
+        const [providersConfig] = await Promise.all([api('/providers/config')]);
+        
+        // 环境变量检查表格
+        const tb = document.getElementById('env-check-table');
+        tb.innerHTML = '';
+        
+        for (const [name, config] of Object.entries(providersConfig || {})) {
+            // 检查环境变量状态
+            const envVars = [];
+            let hasApiKey = false;
+            let hasApiBase = false;
+            
+            if (config.api_key_env) {
+                envVars.push(`Key: ${config.api_key_env}`);
+                // 简单检查环境变量是否存在
+                hasApiKey = true;
+            }
+            
+            if (config.api_base_env) {
+                envVars.push(`Base: ${config.api_base_env}`);
+                hasApiBase = true;
+            }
+            
+            if (config.api_key) {
+                envVars.push('Key: 已配置');
+                hasApiKey = true;
+            }
+            
+            if (config.api_base) {
+                envVars.push('Base: 已配置');
+                hasApiBase = true;
+            }
+            
+            // 状态判断
+            let statusBadge = '';
+            if (config.type === 'custom') {
+                // 自定义渠道需要同时有API Key和API Base
+                if (hasApiKey && hasApiBase) {
+                    statusBadge = '<span class="badge badge-green">✓ 完整</span>';
+                } else if (hasApiKey || hasApiBase) {
+                    statusBadge = '<span class="badge badge-yellow">⚠ 部分配置</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-red">✗ 未配置</span>';
+                }
+            } else {
+                // 标准渠道主要需要API Key
+                if (hasApiKey) {
+                    statusBadge = '<span class="badge badge-green">✓ 完整</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-red">✗ 未配置</span>';
+                }
+            }
+            
+            // 渠道类型显示
+            const typeText = config.type === 'custom' ? '🔧 自定义渠道' : '🌐 标准渠道';
+            
+            tb.innerHTML += `<tr>
+                <td class="px-4 py-3 font-medium dark:text-white">${name}</td>
+                <td class="px-4 py-3"><span class="badge badge-gray">${typeText}</span></td>
+                <td class="px-4 py-3">${statusBadge}</td>
+                <td class="px-4 py-3 text-xs dark:text-gray-300">${envVars.length ? envVars.join(', ') : '无配置'}</td>
+            </tr>`;
+        }
+
+        // 支持的提供商列表
+        const list = document.getElementById('providers-list');
+        list.innerHTML = '';
+        for (const [name, info] of Object.entries(providers.providers || {})) {
+            const type = info.type === 'custom' ? '🔧 自定义渠道' : '🌐 标准提供商';
+            const modelKey = info.model_key ? ` • 模型Key: ${info.model_key}` : '';
+            list.innerHTML += `<div class="card p-3">
+                <div class="font-medium text-sm">${name}</div>
+                <div class="text-xs text-gray-500">${type} • ${info.chat} 聊天模型 • ${info.total} 总模型${modelKey}</div>
+            </div>`;
+        }
+    }
+
+    // ===== Reload =====
+    async function reloadConfig() {
+        await api('/reload', { method: 'POST' });
+        toast('配置已重新加载');
+        refreshTab(document.querySelector('.tab-active')?.dataset.tab || 'dashboard');
+    }
+
+    // ===== Init =====
+    loadDashboard();
+    </script>
+</body>
+</html>
