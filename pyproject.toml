@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multi-ai-assistant"
-version = "2.1.0"
+version = "2.1.1"
 description = "基于 litellm 支持 100+ AI 提供商，通过快捷键在任意界面调用 AI 大模型，CLI + YAML + Web 管理"
 authors = [
     { name="mofanx"}

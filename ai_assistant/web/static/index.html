@@ -405,7 +405,24 @@
             <div id="panel-models" class="fade-in hidden">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold dark:text-white">模型配置</h2>
-                    <button onclick="showModelForm()" class="btn btn-primary">+ 添加模型</button>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="syncModelsFromChannels()" class="btn btn-outline" id="sync-models-btn">↻ 从渠道同步</button>
+                        <button onclick="showModelForm()" class="btn btn-primary">+ 添加模型</button>
+                    </div>
+                </div>
+                <!-- 搜索过滤栏 -->
+                <div class="card p-3 mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-1">
+                            <input id="model-search-input" class="input" placeholder="搜索模型 (ID / 标识符)..." oninput="filterModelsTable()">
+                        </div>
+                        <div class="w-48">
+                            <select id="model-channel-filter" class="input" onchange="filterModelsTable()">
+                                <option value="">全部渠道</option>
+                            </select>
+                        </div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap" id="model-count-label">共 0 个模型</div>
+                    </div>
                 </div>
                 <div id="model-form" class="card p-4 mb-4 hidden">
                     <div class="space-y-4">
@@ -662,7 +679,30 @@
     }
     
     // 页面加载时初始化深色模式
-    document.addEventListener('DOMContentLoaded', initDarkMode);
+    document.addEventListener('DOMContentLoaded', function() {
+        initDarkMode();
+        
+        // 添加点击外部关闭下拉框的功能
+        document.addEventListener('click', function(event) {
+            // 快捷键模型下拉框
+            const hotkeyDropdown = document.getElementById('hf-target-dropdown');
+            if (hotkeyDropdown && !hotkeyDropdown.contains(event.target)) {
+                const options = document.getElementById('hf-target-options');
+                const arrow = document.querySelector('#hf-target-dropdown .dropdown-arrow');
+                if (options) options.style.display = 'none';
+                if (arrow) arrow.classList.remove('open');
+            }
+            
+            // 模型管理界面的下拉框（如果存在的话）
+            const modelDropdown = document.getElementById('mf-model-dropdown');
+            if (modelDropdown && !modelDropdown.contains(event.target)) {
+                const options = document.getElementById('mf-model-options');
+                const arrow = document.querySelector('#mf-model-dropdown .dropdown-arrow');
+                if (options) options.style.display = 'none';
+                if (arrow) arrow.classList.remove('open');
+            }
+        });
+    });
     
     // ===== API helpers =====
     const api = (path, opts = {}) => fetch(`/api${path}`, {
@@ -1354,13 +1394,55 @@
     }
 
     // ===== Models =====
+    let _allModelsData = {};  // 缓存全部模型数据
+    let _allProvidersData = {};  // 缓存渠道数据
+
     async function loadModels() {
-        const models = await api('/models');
-        const providers = await api('/providers/config');
+        const [models, providers] = await Promise.all([api('/models'), api('/providers/config')]);
+        _allModelsData = models;
+        _allProvidersData = providers;
+
+        // 构建渠道过滤下拉
+        const channelSet = new Set();
+        for (const [key, c] of Object.entries(models)) {
+            const ch = c.provider || (c.model && c.model.includes('/') ? c.model.split('/')[0] : '');
+            if (ch) channelSet.add(ch);
+        }
+        const filterSel = document.getElementById('model-channel-filter');
+        const curVal = filterSel.value;
+        filterSel.innerHTML = '<option value="">全部渠道</option>';
+        for (const ch of [...channelSet].sort()) {
+            filterSel.innerHTML += `<option value="${ch}">${ch}</option>`;
+        }
+        filterSel.value = curVal;
+
+        // 渲染（带过滤）
+        renderModelsTable();
+    }
+
+    function filterModelsTable() {
+        renderModelsTable();
+    }
+
+    async function renderModelsTable() {
+        const models = _allModelsData;
+        const providers = _allProvidersData;
+        const query = (document.getElementById('model-search-input').value || '').toLowerCase();
+        const channelFilter = document.getElementById('model-channel-filter').value;
         const tb = document.getElementById('models-table');
         tb.innerHTML = '';
-        
+
+        let visibleCount = 0;
         for (const [key, c] of Object.entries(models)) {
+            const modelId = c.model || '';
+            const ch = c.provider || '';
+
+            // 渠道过滤
+            if (channelFilter && ch !== channelFilter && !key.startsWith(channelFilter + '/')) continue;
+            // 关键词搜索
+            if (query && !key.toLowerCase().includes(query) && !modelId.toLowerCase().includes(query)) continue;
+
+            visibleCount++;
             const opts = [];
             if (c.enable_search) opts.push('搜索');
             if (c.enable_reasoning) opts.push('推理');
@@ -1368,52 +1450,64 @@
             const envVars = [];
             if (c.api_key_env) envVars.push(`Key: ${c.api_key_env}`);
             if (c.api_base_env) envVars.push(`Base: ${c.api_base_env}`);
-            
-            // 获取模型类别（异步）
-            const modelCategory = await getModelCategory(c.model || '');
-            
-            // 获取API渠道信息
+
+            const modelCategory = await getModelCategory(modelId);
+
             let providerInfo = '';
-            if (c.provider) {
-                const provider = providers[c.provider];
-                if (provider) {
-                    if (provider.type === 'custom' || provider.provider === 'custom') {
-                        providerInfo = `🔧 ${c.provider}`;
-                    } else {
-                        providerInfo = `🌐 ${c.provider}`;
-                    }
+            if (ch) {
+                const prov = providers[ch];
+                if (prov) {
+                    providerInfo = (prov.type === 'custom' || prov.provider === 'custom') ? `🔧 ${ch}` : `🌐 ${ch}`;
                 } else {
-                    providerInfo = c.provider;
-                }
-            } else if (c.model && c.model.includes('/')) {
-                // 从模型标识符中提取提供商
-                const providerName = c.model.split('/')[0];
-                const provider = providers[providerName];
-                if (provider) {
-                    if (provider.type === 'custom' || provider.provider === 'custom') {
-                        providerInfo = `🔧 ${providerName}`;
-                    } else {
-                        providerInfo = `🌐 ${providerName}`;
-                    }
-                } else {
-                    providerInfo = `🌐 ${providerName}`;
+                    providerInfo = ch;
                 }
             } else {
                 providerInfo = '自动';
             }
-            
+
+            // 转义 key 中的引号以安全传入 onclick
+            const safeKey = key.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             tb.innerHTML += `<tr>
                 <td class="px-3 py-3 font-medium text-sm">${key}</td>
                 <td class="px-3 py-3"><span class="badge badge-green text-xs">${modelCategory}</span></td>
-                <td class="px-3 py-3 font-mono text-xs break-all">${c.model || '?'}</td>
+                <td class="px-3 py-3 font-mono text-xs break-all">${modelId || '?'}</td>
                 <td class="px-3 py-3 text-xs">${providerInfo}</td>
                 <td class="px-3 py-3 text-xs">${envVars.length ? envVars.join(', ') : '自动'}</td>
                 <td class="px-3 py-3">${opts.length ? opts.map(o => `<span class="badge badge-gray text-xs">${o}</span>`).join(' ') : '-'}</td>
                 <td class="px-3 py-3">
-                    <button onclick="editModel('${key}')" class="text-blue-500 hover:text-blue-700 text-xs mr-2 whitespace-nowrap">编辑</button>
-                    <button onclick="deleteModel('${key}')" class="text-red-500 hover:text-red-700 text-xs whitespace-nowrap">删除</button>
+                    <button onclick="editModel('${safeKey}')" class="text-blue-500 hover:text-blue-700 text-xs mr-2 whitespace-nowrap">编辑</button>
+                    <button onclick="deleteModel('${safeKey}')" class="text-red-500 hover:text-red-700 text-xs whitespace-nowrap">删除</button>
                 </td>
             </tr>`;
+        }
+
+        const total = Object.keys(models).length;
+        const label = document.getElementById('model-count-label');
+        if (query || channelFilter) {
+            label.textContent = `${visibleCount} / ${total} 个模型`;
+        } else {
+            label.textContent = `共 ${total} 个模型`;
+        }
+    }
+
+    async function syncModelsFromChannels() {
+        const btn = document.getElementById('sync-models-btn');
+        const origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ 同步中...';
+        try {
+            const result = await api('/models/sync', { method: 'POST' });
+            if (result.ok) {
+                toast(`✅ 同步完成: ${result.total_models} 个模型, 新增 ${result.total_added} 个`);
+                loadModels();
+            } else {
+                toast(`⚠ ${result.error || '同步失败'}`);
+            }
+        } catch (e) {
+            toast(`❌ 同步失败: ${e.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = origText;
         }
     }
 
@@ -2245,11 +2339,21 @@
         const container = document.getElementById('hf-target-container');
         
         if (action === 'chat') {
-            // 显示模型选择器
-            container.innerHTML = '<select id="hf-target" class="input"><option value="">选择模型...</option></select>';
+            // 显示模型选择器 - 使用自定义下拉框
+            container.innerHTML = `
+                <div class="custom-dropdown" id="hf-target-dropdown">
+                    <div class="dropdown-trigger" onclick="toggleHotkeyModelDropdown()">
+                        <input type="text" id="hf-target-input" class="input" placeholder="选择模型..." readonly>
+                        <span class="dropdown-arrow">▼</span>
+                    </div>
+                    <div class="dropdown-options" id="hf-target-options" style="display: none;">
+                        <!-- 动态加载的模型选项 -->
+                    </div>
+                </div>
+            `;
             loadModelsForHotkey();
         } else if (action === 'role') {
-            // 显示角色选择器
+            // 显示角色选择器 - 保持原有的select（角色数量通常较少）
             container.innerHTML = '<select id="hf-target" class="input"><option value="">选择角色...</option></select>';
             loadRolesForHotkey();
         } else {
@@ -2261,16 +2365,72 @@
     async function loadModelsForHotkey() {
         try {
             const models = await api('/models');
-            const select = document.getElementById('hf-target');
-            select.innerHTML = '<option value="">选择模型...</option>';
+            const optionsContainer = document.getElementById('hf-target-options');
+            
+            // 添加搜索框
+            optionsContainer.innerHTML = `
+                <div class="p-2 border-b border-gray-200 dark:border-gray-600">
+                    <input type="text" class="input text-sm" placeholder="搜索模型..." oninput="filterHotkeyModels(this.value)">
+                </div>
+                <div class="dropdown-list max-h-48 overflow-y-auto">
+                    <!-- 模型选项将在这里动态生成 -->
+                </div>
+            `;
+            
+            const listContainer = optionsContainer.querySelector('.dropdown-list');
             
             for (const [key, model] of Object.entries(models)) {
                 const displayName = model.model || key;
-                select.innerHTML += `<option value="${key}">${displayName}</option>`;
+                const option = document.createElement('div');
+                option.className = 'dropdown-option px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm';
+                option.textContent = displayName;
+                option.dataset.key = key;
+                option.dataset.displayName = displayName;
+                option.onclick = () => selectHotkeyModel(key, displayName);
+                listContainer.appendChild(option);
             }
         } catch (error) {
             console.error('加载模型列表失败:', error);
         }
+    }
+    
+    // 切换快捷键模型下拉框
+    function toggleHotkeyModelDropdown() {
+        const options = document.getElementById('hf-target-options');
+        const arrow = document.querySelector('#hf-target-dropdown .dropdown-arrow');
+        
+        if (options.style.display === 'none') {
+            options.style.display = 'block';
+            arrow.classList.add('open');
+        } else {
+            options.style.display = 'none';
+            arrow.classList.remove('open');
+        }
+    }
+    
+    // 选择快捷键模型
+    function selectHotkeyModel(key, displayName) {
+        document.getElementById('hf-target-input').value = displayName;
+        document.getElementById('hf-target-input').dataset.value = key; // 存储实际值
+        document.getElementById('hf-target-options').style.display = 'none';
+        document.querySelector('#hf-target-dropdown .dropdown-arrow').classList.remove('open');
+    }
+    
+    // 过滤快捷键模型
+    function filterHotkeyModels(searchText) {
+        const options = document.querySelectorAll('#hf-target-options .dropdown-option');
+        const lowerSearch = searchText.toLowerCase();
+        
+        options.forEach(option => {
+            const displayName = option.dataset.displayName.toLowerCase();
+            const key = option.dataset.key.toLowerCase();
+            
+            if (displayName.includes(lowerSearch) || key.includes(lowerSearch)) {
+                option.style.display = 'block';
+            } else {
+                option.style.display = 'none';
+            }
+        });
     }
     
     async function loadRolesForHotkey() {
@@ -2325,9 +2485,31 @@
             
             // 延迟设置目标值，确保目标字段已创建
             setTimeout(() => {
-                const targetElement = document.getElementById('hf-target');
-                if (targetElement) {
-                    targetElement.value = hotkeyConfig.target || '';
+                const action = hotkeyConfig.action || '';
+                const target = hotkeyConfig.target || '';
+                
+                if (action === 'chat') {
+                    // 使用自定义下拉框
+                    const targetInput = document.getElementById('hf-target-input');
+                    if (targetInput) {
+                        // 获取模型的显示名称
+                        const models = api('/models').then(models => {
+                            const model = models[target];
+                            const displayName = model ? (model.model || target) : target;
+                            targetInput.value = displayName;
+                            targetInput.dataset.value = target;
+                        }).catch(err => {
+                            // 如果获取失败，直接使用key作为显示名称
+                            targetInput.value = target;
+                            targetInput.dataset.value = target;
+                        });
+                    }
+                } else {
+                    // 使用传统的select元素
+                    const targetSelect = document.getElementById('hf-target');
+                    if (targetSelect) {
+                        targetSelect.value = target;
+                    }
                 }
             }, 100);
             
@@ -2365,7 +2547,19 @@
     async function saveHotkey() {
         const hotkey = document.getElementById('hf-key').value.trim();
         const action = document.getElementById('hf-action').value;
-        const target = document.getElementById('hf-target').value.trim();
+        
+        // 根据action类型获取target值
+        let target = '';
+        if (action === 'chat') {
+            // 使用自定义下拉框存储的值
+            const targetInput = document.getElementById('hf-target-input');
+            target = targetInput.dataset.value || '';
+        } else {
+            // 使用传统的select元素
+            const targetSelect = document.getElementById('hf-target');
+            target = targetSelect ? targetSelect.value.trim() : '';
+        }
+        
         if (!hotkey) { toast('请填写快捷键'); return; }
         await api('/hotkeys', { method: 'POST', body: { hotkey, action, target } });
         hideHotkeyForm(); loadHotkeys(); toast('快捷键已保存');

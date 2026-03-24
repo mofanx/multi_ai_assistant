@@ -9,8 +9,8 @@
 - **100+ 模型** — 通过 litellm 统一路由，一套配置兼容所有主流 AI 提供商
 - **快捷键随处调用** — 任意界面复制文本 → 按快捷键 → AI 回复自动键入光标
 - **CLI + Web 双管理** — 技术用户用 `maa` 命令秒配，非技术用户用浏览器点点就好
+- **渠道驱动** — 添加渠道自动获取模型列表，支持标准提供商和自定义 API 端点
 - **角色系统** — 模型 + Prompt 组合，中英互译、代码审查、格式转换等一键调用
-- **渠道管理** — 支持标准提供商和自定义 OpenAI 兼容端点 (中转/自部署)
 - **配置热重载** — 修改配置后按快捷键即刻生效，无需重启
 - **YAML 配置** — 灵活的三级配置覆盖：默认 → 用户 → CLI
 
@@ -29,42 +29,38 @@ pip install .
 
 ## 快速开始
 
-### 1. 设置 API 密钥
+### 1. 添加渠道 → 自动获取模型
 
-litellm 自动读取标准环境变量（如 `OPENAI_API_KEY`、`GEMINI_API_KEY`、`ANTHROPIC_API_KEY`）。
+```bash
+# 自定义 API 端点（中转/自部署）— 添加后自动获取所有可用模型
+maa channel add my_api --api-base-env MY_API_BASE --api-key-env MY_API_KEY
+
+# 查看该渠道的模型
+maa model list --channel my_api
+```
+
+对于标准提供商（OpenAI、Gemini 等），设置好环境变量后也可通过渠道管理：
 
 ```bash
 export OPENAI_API_KEY=sk-your-key-here
 ```
 
-### 2. 添加模型
+### 2. 绑定快捷键
 
 ```bash
-# 添加模型（litellm 格式）
-maa model add gpt gpt-4o-mini
-maa model add gemini gemini/gemini-2.0-flash
-maa model add claude anthropic/claude-3-5-sonnet-20241022
-
-# 自定义端点（自部署/中转）
-maa model add my_model openai/my-model --api-base-env MY_API_BASE --api-key-env MY_API_KEY
+# 使用渠道同步的模型 key
+maa hotkey set f9+g chat my_api/gpt-4o-mini
+maa hotkey set f9+q chat my_api/qwen-max
 ```
 
-### 3. 绑定快捷键
-
-```bash
-maa hotkey set f9+g chat gpt
-maa hotkey set f9+c chat claude
-maa hotkey set f9+m chat gemini
-```
-
-### 4. 启动
+### 3. 启动
 
 ```bash
 maa run           # 仅快捷键模式
 maa run --web     # 同时启动 Web 管理界面
 ```
 
-### 5. 使用
+### 4. 使用
 
 1. 在任意界面复制文本到剪贴板
 2. 按快捷键（如 `F9+G`）
@@ -78,38 +74,57 @@ maa run --web     # 同时启动 Web 管理界面
 maa [command] [subcommand] [args]
 ```
 
+### 渠道管理
+
+渠道是模型的来源。添加渠道时自动获取可用模型列表，删除渠道时自动清理关联模型。
+
+```bash
+maa channel list                        # 列出所有渠道
+maa channel add NAME [options]          # 添加渠道（自动获取模型）
+maa channel remove NAME                 # 删除渠道（级联删除关联模型）
+maa channel test NAME                   # 测试渠道连接
+maa channel models NAME [query]         # 查看渠道可用模型（支持搜索）
+
+# 示例：添加自定义 OpenAI 兼容端点
+maa channel add my_api \
+  --api-base-env MY_API_BASE \
+  --api-key-env MY_API_KEY \
+  -d "我的中转 API"
+
+# 查看渠道中包含 "qwen" 的模型
+maa channel models my_api qwen
+```
+
 ### 模型管理
+
+模型通过渠道自动同步，也可手动更新。
 
 ```bash
 maa model list                          # 列出已配置的模型
-maa model add KEY MODEL_ID              # 添加模型
-maa model add gpt gpt-4o-mini           # 示例: OpenAI
-maa model add gemini gemini/gemini-2.0-flash  # 示例: Gemini
+maa model list qwen                     # 按关键词搜索
+maa model list --channel my_api         # 按渠道过滤
 maa model remove KEY                    # 删除模型
 
-# 搜索 litellm 支持的模型
+# 从渠道同步/更新模型
+maa model update                        # 从所有渠道同步模型
+maa model update --channel my_api       # 只同步指定渠道
+
+# 更新 litellm 内置模型数据库
+maa model update-db                     # 从 GitHub 下载最新数据库
+
+# 搜索 litellm 内置模型数据库
 maa model search gpt                    # 按关键词搜索
 maa model search --provider openai      # 按提供商筛选
 maa model search flash -p google        # 组合筛选
 maa model providers                     # 列出所有支持的 AI 提供商
 ```
 
-**model add 选项：**
-
-| 选项 | 说明 |
-|------|------|
-| `--api-key-env NAME` | API 密钥环境变量名 |
-| `--api-base-env NAME` | API 地址环境变量名 |
-| `--no-stream` | 禁用流式输出 |
-| `--enable-search` | 启用联网搜索 |
-| `--enable-reasoning` | 启用推理模式 |
-
 ### 快捷键管理
 
 ```bash
 maa hotkey list                         # 列出所有快捷键
 maa hotkey set KEY ACTION [TARGET]      # 设置快捷键
-maa hotkey set f9+g chat gpt            # 示例: 绑定模型对话
+maa hotkey set f9+g chat my_api/gpt-4o  # 示例: 绑定模型对话
 maa hotkey set f8+e role translator     # 示例: 绑定角色
 maa hotkey remove KEY                   # 删除快捷键
 ```
@@ -123,7 +138,7 @@ maa role remove KEY                     # 删除角色
 
 # 完整示例：创建翻译角色
 maa prompt set trans_en '将以下文本准确翻译成英文，只输出翻译结果。'
-maa role add translator gpt trans_en
+maa role add translator my_api/gpt-4o trans_en
 maa hotkey set f8+e role translator
 ```
 
@@ -133,23 +148,6 @@ maa hotkey set f8+e role translator
 maa prompt list                         # 列出所有 Prompt
 maa prompt set KEY "prompt text"        # 设置 Prompt
 maa prompt remove KEY                   # 删除 Prompt
-```
-
-### 渠道管理
-
-渠道用于管理自定义/中转 API 端点。标准提供商（OpenAI、Gemini 等）无需配置渠道。
-
-```bash
-maa channel list                        # 列出所有渠道
-maa channel add NAME [options]          # 添加渠道
-maa channel remove NAME                 # 删除渠道
-maa channel test NAME                   # 测试渠道连接
-
-# 示例：添加自定义 OpenAI 兼容端点
-maa channel add my_api \
-  --api-base-env MY_API_BASE \
-  --api-key-env MY_API_KEY \
-  -d "我的中转 API"
 ```
 
 ### 配置管理
@@ -187,23 +185,7 @@ maa run --web --web-port 8199           # 自定义端口
 ### 配置示例
 
 ```yaml
-# 模型定义 - 使用 litellm 模型标识符
-# 标准提供商无需设置 api_key_env，litellm 自动读取环境变量
-models:
-  gpt:
-    model: "gpt-4o-mini"
-  gemini:
-    model: "gemini/gemini-2.0-flash"
-  claude:
-    model: "anthropic/claude-3-5-sonnet-20241022"
-  # 自定义端点 (中转/自部署)
-  my_api:
-    model: "openai/qwen-max"
-    api_key_env: "MY_API_KEY"
-    api_base_env: "MY_API_BASE"
-    enable_search: true
-
-# 渠道 - 管理自定义 API 端点
+# 渠道 — 模型的来源，添加渠道后模型自动同步
 channels:
   my_api:
     type: custom
@@ -212,10 +194,27 @@ channels:
     api_key_env: "MY_API_KEY"
     description: "我的中转 API"
 
-# 角色 - 模型 + Prompt 组合
+# 模型 — 由渠道自动同步，也可手动配置
+# key 格式: 渠道名/模型标识符
+models:
+  my_api/gpt-4o-mini:
+    type: litellm
+    model: "gpt-4o-mini"
+    provider: my_api
+    api_key_env: "MY_API_KEY"
+    api_base_env: "MY_API_BASE"
+  my_api/qwen-max:
+    type: litellm
+    model: "qwen-max"
+    provider: my_api
+    api_key_env: "MY_API_KEY"
+    api_base_env: "MY_API_BASE"
+    enable_search: true
+
+# 角色 — 模型 + Prompt 组合
 roles:
   translator:
-    base_model: gpt
+    base_model: my_api/gpt-4o-mini
     prompt_key: translate_to_english
 
 # Prompt 模板
@@ -225,9 +224,8 @@ prompts:
 
 # 快捷键绑定
 hotkeys:
-  "f9+g": { action: "chat", target: "gpt" }
-  "f9+m": { action: "chat", target: "gemini" }
-  "f9+c": { action: "chat", target: "claude" }
+  "f9+g": { action: "chat", target: "my_api/gpt-4o-mini" }
+  "f9+q": { action: "chat", target: "my_api/qwen-max" }
   "f8+e": { action: "role", target: "translator" }
   "f9+r": { action: "reload" }
   "esc":  { action: "cancel" }
@@ -283,12 +281,12 @@ maa run --web
 浏览器打开 `http://127.0.0.1:8199`，提供可视化管理：
 
 - **仪表盘** — 查看系统状态和渠道健康状态
-- **渠道管理** — 添加/测试/删除自定义 API 端点
-- **模型管理** — 从 litellm 数据库搜索并添加模型，支持自定义端点
+- **渠道管理** — 添加/测试/删除 API 端点，自动获取模型
+- **模型管理** — 搜索过滤已配置模型，一键从渠道同步更新
 - **角色管理** — 创建模型 + Prompt 组合角色
 - **快捷键管理** — 可视化绑定快捷键到模型或角色
 - **Prompt 管理** — 管理 Prompt 模板库
-- **环境变量检查** — 查看各模型的凭证配置状态
+- **环境变量检查** — 查看各渠道的凭证配置状态
 
 > Web 界面特别适合不熟悉命令行的用户，所有 CLI 能做的操作都可以在网页上完成。
 

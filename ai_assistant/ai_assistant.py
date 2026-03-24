@@ -10,6 +10,8 @@ import argparse
 import os
 import sys
 import logging
+import re
+from datetime import datetime
 
 from . import __version__
 from .config import get_config, reload_config, ConfigManager
@@ -38,8 +40,98 @@ def _do_reload():
 
 # ===== litellm 模型数据库查询 =====
 
+def _extract_date_from_model(model_id):
+    """从模型名称中提取日期"""
+    # 匹配格式：YYYY-MM-DD, YYYYMMDD, MM-DD 等
+    patterns = [
+        r'(\d{4}-\d{2}-\d{2})',  # 2025-03-11
+        r'(\d{4}\d{2}\d{2})',    # 20250311
+        r'-(\d{4}-\d{2})-',      # -2025-03-
+        r'-(\d{2}-\d{2})-',      # -03-11-
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, model_id)
+        if match:
+            date_str = match.group(1)
+            try:
+                # 标准化日期格式
+                if len(date_str) == 8:  # YYYYMMDD
+                    date_str = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+                elif len(date_str) == 7:  # YYYY-MM
+                    date_str = f"{date_str}-01"
+                elif len(date_str) == 5:  # MM-DD
+                    date_str = f"2024-{date_str}"  # 假设是2024年
+                
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            except:
+                continue
+    return None
+
+def _get_model_priority(model_id, info):
+    """计算模型优先级（数字越小优先级越高）"""
+    priority = 1000  # 默认优先级
+    
+    # 1. 最新日期优先（权重：-500）
+    date = _extract_date_from_model(model_id)
+    if date:
+        # 距今天数越近，优先级越高
+        days_ago = (datetime.now() - date).days
+        priority -= max(0, 500 - days_ago)
+    
+    # 2. 版本号优先（权重：-100）
+    model_lower = model_id.lower()
+    if 'gpt-5' in model_lower:
+        priority -= 100
+    elif 'gpt-4' in model_lower:
+        if '4.1' in model_lower or '4o' in model_lower:
+            priority -= 80
+        else:
+            priority -= 60
+    elif 'claude-3.5' in model_lower or 'claude-3-5' in model_lower:
+        priority -= 70
+    elif 'gemini-2' in model_lower:
+        priority -= 90
+    
+    # 3. 特殊标识优先（权重：-50）
+    special_keywords = ['latest', 'preview', 'turbo', 'pro', 'max']
+    for keyword in special_keywords:
+        if keyword in model_lower:
+            priority -= 50
+            break
+    
+    # 4. 模式优先（权重：-20）
+    mode = info.get('mode', '')
+    if mode == 'chat':
+        priority -= 20
+    elif mode == 'embedding':
+        priority -= 10
+    
+    # 5. 功能支持优先（权重：-10）
+    if info.get('supports_vision', False):
+        priority -= 10
+    if info.get('supports_function_calling', False):
+        priority -= 5
+    
+    return priority
+
 def _get_litellm_models():
-    """获取 litellm 支持的模型数据库"""
+    """获取 litellm 支持的模型数据库（优先缓存）"""
+    import json
+    from pathlib import Path
+    
+    # 尝试从缓存读取
+    cache_dir = Path(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))) / "multi_ai_assistant"
+    cache_file = cache_dir / "litellm_model_cost.json"
+    
+    if cache_file.exists():
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.debug(f"读取缓存失败: {e}")
+    
+    # 回退到内置数据
     try:
         import litellm
         return litellm.model_cost
@@ -48,7 +140,7 @@ def _get_litellm_models():
 
 
 def _search_models(query="", provider="", mode="chat", limit=50):
-    """搜索 litellm 支持的模型
+    """搜索 litellm 支持的模型（智能排序：优先显示最新模型）
 
     Args:
         query: 模型名关键词 (模糊匹配)
@@ -57,10 +149,11 @@ def _search_models(query="", provider="", mode="chat", limit=50):
         limit: 最大返回条数
     """
     db = _get_litellm_models()
-    results = []
     query_lower = query.lower()
     provider_lower = provider.lower()
 
+    # 收集所有匹配的模型
+    matched_models = []
     for model_id, info in db.items():
         if model_id == "sample_spec":
             continue
@@ -75,7 +168,10 @@ def _search_models(query="", provider="", mode="chat", limit=50):
         if query_lower and query_lower not in model_id.lower():
             continue
 
-        results.append({
+        # 计算优先级
+        priority = _get_model_priority(model_id, info)
+        
+        matched_models.append({
             "model": model_id,
             "provider": m_provider,
             "mode": m_mode,
@@ -83,10 +179,18 @@ def _search_models(query="", provider="", mode="chat", limit=50):
             "max_output": info.get("max_output_tokens", 0),
             "vision": info.get("supports_vision", False),
             "function_calling": info.get("supports_function_calling", False),
+            "priority": priority,
         })
 
-        if len(results) >= limit:
-            break
+    # 按优先级排序（数字越小越靠前）
+    matched_models.sort(key=lambda x: x["priority"])
+
+    # 返回前 limit 个（移除 priority 字段，因为这是内部使用的）
+    results = []
+    for model_data in matched_models[:limit]:
+        result = model_data.copy()
+        del result["priority"]  # 移除内部字段
+        results.append(result)
 
     return results
 
@@ -127,6 +231,181 @@ def _get_providers():
     return providers
 
 
+# ===== 渠道模型获取 =====
+
+def _fetch_channel_models(config, channel_name):
+    """从指定渠道获取可用模型列表
+
+    Args:
+        config: ConfigManager 实例
+        channel_name: 渠道名称
+
+    Returns:
+        (models_list, error_msg) — models_list 为 [{"id": ...}, ...] 或 [], error_msg 为错误信息或 None
+    """
+    channels = config.get("channels", {})
+    if channel_name not in channels:
+        return [], f"渠道 '{channel_name}' 不存在"
+
+    ch_conf = channels[channel_name]
+    ch_type = ch_conf.get("type", "custom")
+    provider = ch_conf.get("provider", "")
+
+    # 标准渠道 — 从 litellm 数据库获取
+    if ch_type == "standard" and provider != "custom":
+        db = _get_litellm_models()
+        models = []
+        for model_id, info in db.items():
+            if model_id == "sample_spec":
+                continue
+            m_provider = info.get("litellm_provider", "")
+            m_mode = info.get("mode", "")
+            if m_provider == provider and m_mode == "chat":
+                models.append({"id": model_id})
+        return models, None
+
+    # 自定义渠道 — 调用 /models API
+    api_base = ch_conf.get("api_base") or os.getenv(ch_conf.get("api_base_env", ""), "")
+    api_key = ch_conf.get("api_key") or os.getenv(ch_conf.get("api_key_env", ""), "")
+
+    if not api_base:
+        env_name = ch_conf.get("api_base_env", "")
+        return [], f"API Base 未设置 (环境变量 {env_name} 为空)"
+    if not api_key:
+        env_name = ch_conf.get("api_key_env", "")
+        return [], f"API Key 未设置 (环境变量 {env_name} 为空)"
+
+    try:
+        import requests
+        headers = {"Authorization": f"Bearer {api_key}"}
+        resp = requests.get(f"{api_base.rstrip('/')}/models", headers=headers, timeout=15)
+        if resp.status_code != 200:
+            return [], f"API 返回 HTTP {resp.status_code}"
+        models_data = resp.json()
+        models = [{"id": m.get("id")} for m in models_data.get("data", []) if m.get("id")]
+        return models, None
+    except Exception as e:
+        return [], str(e)
+
+
+def _sync_channel_models_to_config(config, channel_name, models_list):
+    """将获取到的模型列表同步到 config.models 中
+
+    注意: 模型 key 可能包含 '.' 和 '/'，不能使用 config.set() 的点分路径，
+    需要直接操作 user_config 字典。
+
+    Args:
+        config: ConfigManager 实例
+        channel_name: 渠道名称
+        models_list: [{"id": "model-name"}, ...]
+
+    Returns:
+        (added_count, total_count)
+    """
+    channels = config.get("channels", {})
+    ch_conf = channels.get(channel_name, {})
+    ch_type = ch_conf.get("type", "custom")
+    provider = ch_conf.get("provider", "")
+
+    # 直接操作 user_config 字典，避免点分路径解析问题
+    if "models" not in config.user_config:
+        config.user_config["models"] = {}
+    user_models = config.user_config["models"]
+
+    existing_models = config.models or {}
+    added = 0
+
+    for m in models_list:
+        model_id = m["id"]
+        # 模型 key: channel_name/model_id
+        model_key = f"{channel_name}/{model_id}"
+
+        if model_key in existing_models:
+            continue  # 已存在，跳过
+
+        model_conf = {
+            "model": model_id,
+            "provider": channel_name,
+            "type": "litellm",
+        }
+
+        # 标准渠道直接继承凭证环境变量
+        if ch_type == "standard" and provider != "custom":
+            api_key_env = ch_conf.get("api_key_env", "")
+            if api_key_env:
+                model_conf["api_key_env"] = api_key_env
+
+        user_models[model_key] = model_conf
+        added += 1
+
+    config._rebuild()
+    return added, len(models_list)
+
+
+def _remove_channel_hotkeys(config, channel_name):
+    """删除与指定渠道相关的快捷键
+    
+    Args:
+        config: ConfigManager 实例
+        channel_name: 渠道名称
+        
+    Returns:
+        list: 被删除的快捷键列表
+    """
+    user_hotkeys = config.user_config.get("hotkeys", {})
+    removed_hotkeys = []
+    
+    for key, binding in list(user_hotkeys.items()):
+        if binding.get("action") == "chat":
+            target = binding.get("target", "")
+            # 检查目标模型是否属于被删除的渠道
+            if target.startswith(f"{channel_name}/"):
+                del user_hotkeys[key]
+                removed_hotkeys.append(key)
+    
+    return removed_hotkeys
+
+
+def _update_litellm_db():
+    """从 GitHub 下载最新的 litellm 模型数据库
+
+    Returns:
+        (success, message)
+    """
+    import json
+    from pathlib import Path
+
+    url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+    cache_dir = Path(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))) / "multi_ai_assistant"
+    cache_file = cache_dir / "litellm_model_cost.json"
+
+    try:
+        import urllib.request
+        print(f"正在从 GitHub 下载最新模型数据库...")
+        req = urllib.request.Request(url, headers={"User-Agent": "multi_ai_assistant"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read()
+
+        new_db = json.loads(data)
+        model_count = len([k for k in new_db if k != "sample_spec"])
+
+        # 保存到缓存
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(new_db, f)
+
+        # 更新当前运行时
+        try:
+            import litellm
+            litellm.model_cost = new_db
+        except ImportError:
+            pass
+
+        return True, f"已更新模型数据库: {model_count} 个模型 (缓存: {cache_file})"
+    except Exception as e:
+        return False, f"更新失败: {e}"
+
+
 # ===== CLI 构建 =====
 
 def build_cli():
@@ -155,16 +434,14 @@ def build_cli():
     p_model = sub.add_parser("model", help="模型管理")
     model_sub = p_model.add_subparsers(dest="model_cmd")
 
-    model_sub.add_parser("list", help="列出已配置的模型")
+    p_model_list = model_sub.add_parser("list", help="列出已配置的模型 (支持搜索过滤)")
+    p_model_list.add_argument("query", nargs="?", default="", help="搜索关键词 (模型ID/标识符)")
+    p_model_list.add_argument("--channel", "-c", default="", help="按渠道过滤")
 
-    p_model_add = model_sub.add_parser("add", help="添加模型")
-    p_model_add.add_argument("key", help="模型名称 (如 gpt)")
-    p_model_add.add_argument("model_id", help="litellm 模型标识符 (如 gpt-4o-mini)")
-    p_model_add.add_argument("--api-key-env", default="", help="API 密钥环境变量名")
-    p_model_add.add_argument("--api-base-env", default="", help="API 地址环境变量名")
-    p_model_add.add_argument("--no-stream", action="store_true", help="禁用流式输出")
-    p_model_add.add_argument("--enable-search", action="store_true")
-    p_model_add.add_argument("--enable-reasoning", action="store_true")
+    p_model_update = model_sub.add_parser("update", help="从渠道同步模型列表到配置")
+    p_model_update.add_argument("--channel", "-c", default="", help="只更新指定渠道 (默认全部)")
+
+    model_sub.add_parser("update-db", help="更新 litellm 内置模型数据库 (从 GitHub)")
 
     p_model_rm = model_sub.add_parser("remove", help="删除模型")
     p_model_rm.add_argument("key", help="模型名称")
@@ -238,6 +515,10 @@ def build_cli():
     p_ch_test = channel_sub.add_parser("test", help="测试渠道连接")
     p_ch_test.add_argument("name", help="渠道名称")
 
+    p_ch_models = channel_sub.add_parser("models", help="查看渠道可用模型列表")
+    p_ch_models.add_argument("name", help="渠道名称")
+    p_ch_models.add_argument("query", nargs="?", default="", help="搜索关键词")
+
     # --- config ---
     p_config = sub.add_parser("config", help="配置管理")
     config_sub = p_config.add_subparsers(dest="config_cmd")
@@ -257,66 +538,129 @@ def cmd_model(args, config: ConfigManager):
         models = config.models
         if not models:
             print("没有配置模型。")
-            print("\n快速添加:")
-            print("  maa model search gpt         # 搜索可用模型")
-            print("  maa model add gpt gpt-4o-mini  # 添加模型")
+            print("\n通过渠道添加模型:")
+            print("  maa channel add my_api --api-base-env MY_API_BASE --api-key-env MY_API_KEY")
+            print("  maa model update             # 从渠道同步模型列表")
             return
-        print("\n=== 已配置模型 ===")
+
+        # 过滤
+        query = getattr(args, "query", "") or ""
+        channel_filter = getattr(args, "channel", "") or ""
+        query_lower = query.lower()
+
+        filtered = {}
         for key, conf in models.items():
-            model_id = conf.get("model", "?")
-            extras = []
-            if conf.get("api_key_env"):
-                extras.append(f"key={conf['api_key_env']}")
-            if conf.get("api_base_env"):
-                extras.append(f"base={conf['api_base_env']}")
-            if conf.get("enable_search"):
-                extras.append("search")
-            if conf.get("enable_reasoning"):
-                extras.append("reasoning")
-            if not conf.get("stream", True):
-                extras.append("no-stream")
-            extra_str = f"  ({', '.join(extras)})" if extras else ""
-            print(f"  {key:<16} {model_id}{extra_str}")
+            # 按渠道过滤
+            if channel_filter:
+                model_provider = conf.get("provider", "")
+                if channel_filter != model_provider and not key.startswith(f"{channel_filter}/"):
+                    continue
+            # 按关键词搜索 (匹配 key 或 model_id)
+            if query_lower:
+                model_id = conf.get("model", "")
+                if query_lower not in key.lower() and query_lower not in model_id.lower():
+                    continue
+            filtered[key] = conf
+
+        if not filtered:
+            print(f"未找到匹配的模型。")
+            if query or channel_filter:
+                print(f"  当前共 {len(models)} 个模型，尝试放宽搜索条件")
+            return
+
+        # 按渠道分组显示
+        by_channel = {}
+        for key, conf in filtered.items():
+            ch = conf.get("provider", "litellm")
+            by_channel.setdefault(ch, []).append((key, conf))
+
+        filter_desc = []
+        if query:
+            filter_desc.append(f"关键词='{query}'")
+        if channel_filter:
+            filter_desc.append(f"渠道='{channel_filter}'")
+        title = f"已配置模型 (共 {len(filtered)} 个"
+        if filter_desc:
+            title += f", {', '.join(filter_desc)}"
+        title += ")"
+
+        print(f"\n=== {title} ===")
+        for ch_name, ch_models in by_channel.items():
+            print(f"\n  [{ch_name}] ({len(ch_models)} 个模型)")
+            for key, conf in ch_models:
+                model_id = conf.get("model", "?")
+                extras = []
+                if conf.get("enable_search"):
+                    extras.append("search")
+                if conf.get("enable_reasoning"):
+                    extras.append("reasoning")
+                if not conf.get("stream", True):
+                    extras.append("no-stream")
+                extra_str = f"  ({', '.join(extras)})" if extras else ""
+                print(f"    {key:<40} {model_id}{extra_str}")
         print()
 
-    elif args.model_cmd == "add":
-        model_conf = {"model": args.model_id}
-        if args.api_key_env:
-            model_conf["api_key_env"] = args.api_key_env
-        if args.api_base_env:
-            model_conf["api_base_env"] = args.api_base_env
-        if args.no_stream:
-            model_conf["stream"] = False
-        if args.enable_search:
-            model_conf["enable_search"] = True
-        if args.enable_reasoning:
-            model_conf["enable_reasoning"] = True
+    elif args.model_cmd == "update":
+        channel_filter = getattr(args, "channel", "") or ""
+        channels = config.get("channels", {})
 
-        # 在 litellm 数据库中查找模型信息（仅作提示，不阻止添加）
-        db = _get_litellm_models()
-        resolved = _resolve_model_in_db(db, args.model_id)
-        if resolved:
-            provider = resolved.get("litellm_provider", "unknown")
-            print(f"✓ 模型已添加: {args.key} → {args.model_id} (provider: {provider})")
-        elif args.api_base_env:
-            print(f"✓ 模型已添加: {args.key} → {args.model_id} (自定义端点)")
+        if not channels:
+            print("没有配置渠道。请先添加渠道:")
+            print("  maa channel add my_api --api-base-env MY_API_BASE --api-key-env MY_API_KEY")
+            return
+
+        target_channels = {}
+        if channel_filter:
+            if channel_filter not in channels:
+                print(f"✗ 渠道 '{channel_filter}' 不存在")
+                return
+            target_channels[channel_filter] = channels[channel_filter]
         else:
-            # litellm 可路由的模型远多于 model_cost 数据库中的，直接添加即可
-            print(f"✓ 模型已添加: {args.key} → {args.model_id}")
+            target_channels = channels
 
-        config.set(f"models.{args.key}", model_conf)
-        config.save_user_config()
+        total_added = 0
+        total_models = 0
+
+        for ch_name, ch_conf in target_channels.items():
+            print(f"正在获取渠道 '{ch_name}' 的模型列表...")
+            models_list, err = _fetch_channel_models(config, ch_name)
+            if err:
+                print(f"  ✗ {ch_name}: {err}")
+                continue
+
+            added, count = _sync_channel_models_to_config(config, ch_name, models_list)
+            total_added += added
+            total_models += count
+            print(f"  ✓ {ch_name}: {count} 个模型 (新增 {added})")
+
+        if total_added > 0:
+            config.save_user_config()
+
+        print(f"\n同步完成: 共 {total_models} 个模型, 新增 {total_added} 个")
+        if total_added > 0:
+            print(f"\n查看模型:  maa model list")
+            print(f"绑定快捷键: maa hotkey set f9+g chat <模型key>")
+
+    elif args.model_cmd == "update-db":
+        ok, msg = _update_litellm_db()
+        if ok:
+            print(f"✓ {msg}")
+        else:
+            print(f"✗ {msg}")
 
     elif args.model_cmd == "remove":
         models = config.models
         if args.key not in models:
             print(f"✗ 模型 '{args.key}' 不存在")
             return
+        # 直接操作字典，避免 key 含 '.' 时路径解析错误
         user_models = config.user_config.get("models", {})
         if args.key in user_models:
             del user_models[args.key]
+            config._rebuild()
             config.save_user_config()
-        config.load()
+        else:
+            config.load()
         print(f"✓ 模型已删除: {args.key}")
 
     elif args.model_cmd == "search":
@@ -358,8 +702,9 @@ def cmd_model(args, config: ConfigManager):
                 features.append("tools")
             feat_str = ", ".join(features) if features else ""
             print(f"  {r['model']:<46} {r['provider']:<16} {ctx:<10} {feat_str}")
-        print(f"\n添加模型: maa model add <名称> <模型标识符>")
-        print(f"  示例: maa model add gpt {results[0]['model']}")
+        print(f"\n提示: 以上为 litellm 内置模型数据库。自定义渠道模型请使用:")
+        print(f"  maa channel models <渠道名>     # 查看渠道可用模型")
+        print(f"  maa model update-db             # 更新内置数据库")
         print()
 
     elif args.model_cmd == "providers":
@@ -421,7 +766,9 @@ def cmd_hotkey(args, config: ConfigManager):
 
         # 验证 target 是否存在
         if args.action == "chat" and args.target and args.target not in config.models:
-            print(f"⚠ 模型 '{args.target}' 尚未配置，请先添加: maa model add {args.target} <model_id>")
+            print(f"⚠ 模型 '{args.target}' 尚未配置")
+            print(f"  查看可用模型: maa model list")
+            print(f"  从渠道同步:   maa model update")
 
         binding = {"action": args.action}
         if args.target:
@@ -460,8 +807,8 @@ def cmd_role(args, config: ConfigManager):
 
     elif args.role_cmd == "add":
         if args.base_model not in config.models:
-            print(f"✗ 基础模型 '{args.base_model}' 不存在，请先添加:")
-            print(f"  maa model add {args.base_model} <model_id>")
+            print(f"✗ 基础模型 '{args.base_model}' 不存在")
+            print(f"  查看可用模型: maa model list")
             return
         if args.prompt_key not in config.prompts:
             print(f"⚠ Prompt '{args.prompt_key}' 不存在，请先添加:")
@@ -575,49 +922,102 @@ def cmd_channel(args, config: ConfigManager):
         config.set(f"channels.{args.name}", channel_conf)
         config.save_user_config()
         print(f"✓ 渠道已添加: {args.name}")
-        print(f"  接下来添加使用此渠道的模型:")
-        print(f"  maa model add my_model openai/<model-name> --api-base-env {args.api_base_env or 'API_BASE'} --api-key-env {args.api_key_env or 'API_KEY'}")
+
+        # 自动获取模型列表并同步
+        print(f"正在获取模型列表...")
+        models_list, err = _fetch_channel_models(config, args.name)
+        if err:
+            print(f"  ⚠ 获取模型列表失败: {err}")
+            print(f"  稍后可手动同步: maa model update --channel {args.name}")
+        elif models_list:
+            added, count = _sync_channel_models_to_config(config, args.name, models_list)
+            config.save_user_config()
+            print(f"  ✓ 已同步 {count} 个模型 (新增 {added})")
+            print(f"\n查看模型:  maa model list --channel {args.name}")
+            print(f"绑定快捷键: maa hotkey set f9+g chat {args.name}/<model-id>")
+        else:
+            print(f"  ⚠ 渠道返回空模型列表")
 
     elif args.channel_cmd == "remove":
         channels = config.get("channels", {})
         if args.name not in channels:
             print(f"✗ 渠道 '{args.name}' 不存在")
             return
-        config.delete(f"channels.{args.name}")
+
+        # 直接操作字典，避免 key 含 '.' 时路径解析错误
+        user_models = config.user_config.get("models", {})
+        removed_models = [k for k, v in user_models.items()
+                          if isinstance(v, dict) and v.get("provider") == args.name]
+        for mk in removed_models:
+            del user_models[mk]
+
+        # 级联删除相关快捷键
+        removed_hotkeys = _remove_channel_hotkeys(config, args.name)
+
+        user_channels = config.user_config.get("channels", {})
+        if args.name in user_channels:
+            del user_channels[args.name]
+
+        config._rebuild()
         config.save_user_config()
-        print(f"✓ 渠道已删除: {args.name}")
+        
+        # 统一报告删除结果
+        messages = []
+        if removed_models:
+            messages.append(f"删除 {len(removed_models)} 个关联模型")
+        if removed_hotkeys:
+            messages.append(f"删除 {len(removed_hotkeys)} 个相关快捷键")
+        
+        if messages:
+            detail = f" (同时{', '.join(messages)})"
+            print(f"✓ 渠道已删除: {args.name}{detail}")
+        else:
+            print(f"✓ 渠道已删除: {args.name}")
 
     elif args.channel_cmd == "test":
         channels = config.get("channels", {})
         if args.name not in channels:
             print(f"✗ 渠道 '{args.name}' 不存在")
             return
-        ch_conf = channels[args.name]
-        api_base = ch_conf.get("api_base") or os.getenv(ch_conf.get("api_base_env", ""), "")
-        api_key = ch_conf.get("api_key") or os.getenv(ch_conf.get("api_key_env", ""), "")
-
-        if not api_base:
-            env_name = ch_conf.get("api_base_env", "")
-            print(f"✗ API Base 未设置 (环境变量 {env_name} 为空)")
-            return
-        if not api_key:
-            env_name = ch_conf.get("api_key_env", "")
-            print(f"✗ API Key 未设置 (环境变量 {env_name} 为空)")
-            return
 
         print(f"正在测试渠道 '{args.name}'...")
-        try:
-            import requests
-            headers = {"Authorization": f"Bearer {api_key}"}
-            resp = requests.get(f"{api_base.rstrip('/')}/models", headers=headers, timeout=10)
-            if resp.status_code == 200:
-                models_data = resp.json()
-                model_count = len(models_data.get("data", []))
-                print(f"✓ 连接成功! 可用模型: {model_count} 个")
-            else:
-                print(f"✗ 连接失败: HTTP {resp.status_code}")
-        except Exception as e:
-            print(f"✗ 连接失败: {e}")
+        models_list, err = _fetch_channel_models(config, args.name)
+        if err:
+            print(f"✗ 连接失败: {err}")
+        else:
+            print(f"✓ 连接成功! 可用模型: {len(models_list)} 个")
+
+    elif args.channel_cmd == "models":
+        channels = config.get("channels", {})
+        if args.name not in channels:
+            print(f"✗ 渠道 '{args.name}' 不存在")
+            return
+
+        print(f"正在获取渠道 '{args.name}' 的模型列表...")
+        models_list, err = _fetch_channel_models(config, args.name)
+        if err:
+            print(f"✗ {err}")
+            return
+
+        # 搜索过滤
+        query = getattr(args, "query", "") or ""
+        if query:
+            query_lower = query.lower()
+            models_list = [m for m in models_list if query_lower in m["id"].lower()]
+
+        if not models_list:
+            print(f"未找到匹配的模型")
+            return
+
+        print(f"\n=== 渠道 '{args.name}' 可用模型 (共 {len(models_list)} 个) ===")
+        # 标记哪些已添加到配置
+        configured_models = config.models or {}
+        for m in models_list:
+            model_key = f"{args.name}/{m['id']}"
+            status = "✓" if model_key in configured_models else " "
+            print(f"  {status} {m['id']}")
+        print(f"\n✓ = 已同步到配置")
+        print(f"同步全部: maa model update --channel {args.name}")
 
 
 def cmd_config(args, config: ConfigManager):
@@ -634,7 +1034,9 @@ def cmd_config(args, config: ConfigManager):
     elif args.config_cmd == "check":
         models = config.models
         if not models:
-            print("没有配置模型。先添加模型: maa model add <key> <model_id>")
+            print("没有配置模型。请先添加渠道并同步模型:")
+            print("  maa channel add my_api --api-base-env MY_API_BASE --api-key-env MY_API_KEY")
+            print("  maa model update")
             return
         print(f"\n=== 模型环境变量检查 (共 {len(models)} 个模型) ===")
         for key, conf in models.items():
@@ -748,16 +1150,16 @@ def cmd_run(args, config: ConfigManager):
         print()
         print("快速开始 (3 步):")
         print()
-        print("  1. 设置 API 密钥:")
-        print("     export OPENAI_API_KEY=sk-...")
+        print("  1. 添加渠道 (设置 API 端点和密钥):")
+        print("     maa channel add my_api --api-base-env MY_API_BASE --api-key-env MY_API_KEY")
         print()
-        print("  2. 搜索并添加模型:")
-        print("     maa model search gpt")
-        print("     maa model add gpt gpt-4o-mini")
+        print("  2. 同步模型列表:")
+        print("     maa model update")
         print()
         print("  3. 绑定快捷键并启动:")
-        print("     maa hotkey set f9+g chat gpt")
-        print("     maa run")
+        print("     maa model list                        # 查看可用模型")
+        print("     maa hotkey set f9+g chat my_api/gpt-4o  # 绑定快捷键")
+        print("     maa run --web                         # 启动")
         print()
         if not has_models:
             print("提示: 当前没有配置任何模型，程序将以最小配置运行。")

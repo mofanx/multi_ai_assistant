@@ -233,6 +233,29 @@ class ModelFactory:
         
         return compatibility_map.get(compatibility_type, "openai")
 
+    def _should_add_prefix(self, model_conf: dict) -> bool:
+        """判断是否应该添加前缀
+        
+        Args:
+            model_conf: 模型配置字典
+            
+        Returns:
+            bool: 是否应该添加前缀
+        """
+        if not self._is_custom_channel(model_conf):
+            return False
+        
+        model_id = model_conf.get("model", "")
+        
+        # 检查是否以已知提供商前缀开头
+        known_providers = ['openai/', 'anthropic/', 'google/', 'azure/', 'cohere/', 'groq/', 'mistral/', 'together/']
+        
+        for provider in known_providers:
+            if model_id.startswith(provider):
+                return False  # 已有标准前缀，不需要添加
+        
+        return True  # 其他情况都需要添加前缀
+
     def _create_litellm_instance(self, model_conf: dict, prompt: str = ""):
         """创建 litellm 统一模型实例"""
         from .assistant.openai_model import OpenAIAssistant
@@ -241,7 +264,7 @@ class ModelFactory:
 
         model_id = model_conf.get("model", "gpt-4o-mini")
         # 自定义渠道需要根据兼容类型添加相应前缀
-        if self._is_custom_channel(model_conf) and '/' not in model_id:
+        if self._should_add_prefix(model_conf):
             prefix = self._get_compatibility_prefix(model_conf)
             model_id = f"{prefix}/{model_id}"
             logger.debug(f"自定义渠道模型自动添加 {prefix}/ 前缀: {model_id}")

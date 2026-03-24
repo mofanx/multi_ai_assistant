@@ -7,9 +7,12 @@ Web 管理界面后端 - 基于 FastAPI
 """
 
 import os
+import sys
 import threading
 import logging
+import re
 from pathlib import Path
+from datetime import datetime
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -29,6 +32,80 @@ app = FastAPI(title="Multi AI Assistant", version="2.1.0")
 
 # 静态文件
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+# ===== 智能排序辅助函数 =====
+
+def _extract_date_from_model(model_id):
+    """从模型名称中提取日期"""
+    patterns = [
+        r'(\d{4}-\d{2}-\d{2})',  # 2025-03-11
+        r'(\d{4}\d{2}\d{2})',    # 20250311
+        r'-(\d{4}-\d{2})-',      # -2025-03-
+        r'-(\d{2}-\d{2})-',      # -03-11-
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, model_id)
+        if match:
+            date_str = match.group(1)
+            try:
+                if len(date_str) == 8:  # YYYYMMDD
+                    date_str = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+                elif len(date_str) == 7:  # YYYY-MM
+                    date_str = f"{date_str}-01"
+                elif len(date_str) == 5:  # MM-DD
+                    date_str = f"2024-{date_str}"
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            except:
+                continue
+    return None
+
+def _get_model_priority(model_id, info):
+    """计算模型优先级（数字越小优先级越高）"""
+    priority = 1000
+    
+    # 1. 最新日期优先（权重：-500）
+    date = _extract_date_from_model(model_id)
+    if date:
+        days_ago = (datetime.now() - date).days
+        priority -= max(0, 500 - days_ago)
+    
+    # 2. 版本号优先（权重：-100）
+    model_lower = model_id.lower()
+    if 'gpt-5' in model_lower:
+        priority -= 100
+    elif 'gpt-4' in model_lower:
+        if '4.1' in model_lower or '4o' in model_lower:
+            priority -= 80
+        else:
+            priority -= 60
+    elif 'claude-3.5' in model_lower or 'claude-3-5' in model_lower:
+        priority -= 70
+    elif 'gemini-2' in model_lower:
+        priority -= 90
+    
+    # 3. 特殊标识优先（权重：-50）
+    special_keywords = ['latest', 'preview', 'turbo', 'pro', 'max']
+    for keyword in special_keywords:
+        if keyword in model_lower:
+            priority -= 50
+            break
+    
+    # 4. 模式优先（权重：-20）
+    mode = info.get('mode', '')
+    if mode == 'chat':
+        priority -= 20
+    elif mode == 'embedding':
+        priority -= 10
+    
+    # 5. 功能支持优先（权重：-10）
+    if info.get('supports_vision', False):
+        priority -= 10
+    if info.get('supports_function_calling', False):
+        priority -= 5
+    
+    return priority
 
 
 # ===== Pydantic 模型 =====
@@ -115,14 +192,24 @@ def check_env():
 
 @app.get("/api/models/available")
 def list_available_models(q: str = "", provider: str = "", limit: int = 50):
-    """搜索 litellm 支持的模型"""
+    """搜索 litellm 支持的模型（智能排序：优先显示最新模型）"""
     try:
-        import litellm
-        db = litellm.model_cost
+        # 优先使用缓存数据库，与 CLI 保持一致
+        cache_dir = Path(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))) / "multi_ai_assistant"
+        cache_file = cache_dir / "litellm_model_cost.json"
+        
+        if cache_file.exists():
+            import json
+            with open(cache_file, "r", encoding="utf-8") as f:
+                db = json.load(f)
+        else:
+            import litellm
+            db = litellm.model_cost
     except Exception:
-        raise HTTPException(status_code=500, detail="无法加载 litellm 模型数据库")
+        raise HTTPException(status_code=500, detail="无法加载模型数据库")
 
-    results = []
+    # 收集所有匹配的模型
+    matched_models = []
     q_lower = q.lower()
     p_lower = provider.lower()
 
@@ -131,22 +218,38 @@ def list_available_models(q: str = "", provider: str = "", limit: int = 50):
             continue
         m_provider = info.get("litellm_provider", "")
         m_mode = info.get("mode", "")
+        
+        # 只显示聊天模型（保持原有行为）
         if m_mode != "chat":
             continue
         if p_lower and p_lower not in m_provider.lower():
             continue
         if q_lower and q_lower not in model_id.lower():
             continue
-        results.append({
+        
+        # 计算优先级
+        priority = _get_model_priority(model_id, info)
+        
+        matched_models.append({
             "model": model_id,
             "provider": m_provider,
             "max_input_tokens": info.get("max_input_tokens", 0),
             "max_output_tokens": info.get("max_output_tokens", 0),
             "supports_vision": info.get("supports_vision", False),
             "supports_function_calling": info.get("supports_function_calling", False),
+            "priority": priority,
         })
-        if len(results) >= limit:
-            break
+    
+    # 按优先级排序
+    matched_models.sort(key=lambda x: x["priority"])
+    
+    # 返回前 limit 个（移除 priority 字段）
+    results = []
+    for model_data in matched_models[:limit]:
+        result = model_data.copy()
+        del result["priority"]
+        results.append(result)
+    
     return {"count": len(results), "models": results}
 
 
@@ -749,12 +852,61 @@ def get_model_type_info(model_name: str):
         raise HTTPException(status_code=500, detail=f"获取模型类型信息失败: {str(e)}")
 
 
+@app.post("/api/models/sync")
+def sync_models_from_channels(channel: str = ""):
+    """从渠道同步模型列表到配置"""
+    if not _config:
+        raise HTTPException(status_code=500, detail="配置未初始化")
+
+    from ..ai_assistant import _fetch_channel_models, _sync_channel_models_to_config
+
+    channels = _config.get("channels", {})
+    if not channels:
+        return {"ok": False, "error": "没有配置渠道"}
+
+    target_channels = {}
+    if channel:
+        if channel not in channels:
+            raise HTTPException(status_code=404, detail=f"渠道 '{channel}' 不存在")
+        target_channels[channel] = channels[channel]
+    else:
+        target_channels = channels
+
+    results = []
+    total_added = 0
+    total_models = 0
+
+    for ch_name in target_channels:
+        models_list, err = _fetch_channel_models(_config, ch_name)
+        if err:
+            results.append({"channel": ch_name, "error": err})
+            continue
+        added, count = _sync_channel_models_to_config(_config, ch_name, models_list)
+        total_added += added
+        total_models += count
+        results.append({"channel": ch_name, "total": count, "added": added})
+
+    if total_added > 0:
+        _config.save_user_config()
+
+    return {
+        "ok": True,
+        "total_models": total_models,
+        "total_added": total_added,
+        "channels": results,
+    }
+
+
 @app.post("/api/models")
 def update_model(req: ModelUpdateRequest):
     """添加或更新模型配置"""
     if not _config:
         raise HTTPException(status_code=500, detail="配置未初始化")
-    _config.set(f"models.{req.key}", req.config)
+    # 直接操作字典，避免 key 含 '.' 时路径解析错误
+    if "models" not in _config.user_config:
+        _config.user_config["models"] = {}
+    _config.user_config["models"][req.key] = req.config
+    _config._rebuild()
     _config.save_user_config()
     return {"ok": True, "key": req.key}
 
@@ -793,10 +945,12 @@ def delete_model(key: str):
             detail=f"无法删除模型 '{key}'，以下快捷键正在使用它: {hotkey_list}。请先删除或修改这些快捷键。"
         )
     
-    # 执行删除
-    del models[key]
-    _config.set("models", models)
-    _config.save_user_config()
+    # 直接操作字典，避免 key 含 '.' 时路径解析错误
+    user_models = _config.user_config.get("models", {})
+    if key in user_models:
+        del user_models[key]
+        _config._rebuild()
+        _config.save_user_config()
     return {"ok": True, "key": key}
 
 
