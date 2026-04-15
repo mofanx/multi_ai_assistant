@@ -5,7 +5,7 @@ Multi AI Assistant - 通过快捷键在任意界面调用 AI 大模型
 通过 YAML 配置 + CLI 子命令灵活管理模型、快捷键和 Prompt。
 """
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 from .ai_assistant import AI_Assistant
 from .config import get_config, ConfigManager

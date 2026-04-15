@@ -407,6 +407,7 @@
                     <h2 class="text-lg font-semibold dark:text-white">模型配置</h2>
                     <div class="flex items-center space-x-2">
                         <button onclick="syncModelsFromChannels()" class="btn btn-outline" id="sync-models-btn">↻ 从渠道同步</button>
+                        <button onclick="showBatchDeleteModels()" class="btn btn-danger hidden" id="batch-delete-btn">🗑️ 批量删除</button>
                         <button onclick="showModelForm()" class="btn btn-primary">+ 添加模型</button>
                     </div>
                 </div>
@@ -505,6 +506,7 @@
                 <div class="card overflow-hidden">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50 dark:bg-gray-700 text-left"><tr>
+                            <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-10"><input type="checkbox" id="select-all-models" onchange="toggleSelectAllModels()"></th>
                             <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-32">模型 ID</th>
                             <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 w-28">类别</th>
                             <th class="px-3 py-3 font-medium text-gray-500 dark:text-gray-300 min-w-48">模型标识符</th>
@@ -1468,6 +1470,7 @@
             // 转义 key 中的引号以安全传入 onclick
             const safeKey = key.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             tb.innerHTML += `<tr>
+                <td class="px-3 py-3"><input type="checkbox" class="model-checkbox" data-key="${safeKey}" onchange="updateBatchDeleteButton()"></td>
                 <td class="px-3 py-3 font-medium text-sm">${key}</td>
                 <td class="px-3 py-3"><span class="badge badge-green text-xs">${modelCategory}</span></td>
                 <td class="px-3 py-3 font-mono text-xs break-all">${modelId || '?'}</td>
@@ -2089,7 +2092,7 @@
         if (!confirm(`确认删除模型 "${key}"?`)) return;
         try {
             await api(`/models/${key}`, { method: 'DELETE' });
-            loadModels(); 
+            loadModels();
             toast('模型已删除');
         } catch (error) {
             const errorMsg = error.message;
@@ -2099,6 +2102,64 @@
             } else {
                 toast(`删除失败: ${errorMsg}`);
             }
+        }
+    }
+
+    // 全选/取消全选模型
+    function toggleSelectAllModels() {
+        const selectAll = document.getElementById('select-all-models');
+        const checkboxes = document.querySelectorAll('.model-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+        updateBatchDeleteButton();
+    }
+
+    // 更新批量删除按钮显示状态
+    function updateBatchDeleteButton() {
+        const checkboxes = document.querySelectorAll('.model-checkbox:checked');
+        const btn = document.getElementById('batch-delete-btn');
+        if (checkboxes.length > 0) {
+            btn.classList.remove('hidden');
+            btn.textContent = `🗑️ 批量删除 (${checkboxes.length})`;
+        } else {
+            btn.classList.add('hidden');
+        }
+    }
+
+    // 显示批量删除确认对话框
+    function showBatchDeleteModels() {
+        const checkboxes = document.querySelectorAll('.model-checkbox:checked');
+        if (checkboxes.length === 0) return;
+
+        const keys = Array.from(checkboxes).map(cb => cb.dataset.key);
+        if (confirm(`确认删除选中的 ${keys.length} 个模型?`)) {
+            deleteSelectedModels(keys);
+        }
+    }
+
+    // 执行批量删除
+    async function deleteSelectedModels(keys) {
+        try {
+            const result = await api('/models/batch', {
+                method: 'DELETE',
+                body: { keys: keys }
+            });
+
+            if (result.ok) {
+                toast(`✅ 已删除 ${result.deleted_count} 个模型`);
+                if (result.dependent_hotkeys && result.dependent_hotkeys.length > 0) {
+                    toast(`⚠️ 以下快捷键受影响: ${result.dependent_hotkeys.join(', ')}`, 5000);
+                }
+                loadModels();
+                // 重置全选复选框
+                document.getElementById('select-all-models').checked = false;
+                updateBatchDeleteButton();
+            } else {
+                toast(`❌ 批量删除失败: ${result.error || '未知错误'}`);
+            }
+        } catch (error) {
+            toast(`❌ 批量删除失败: ${error.message}`);
         }
     }
 

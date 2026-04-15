@@ -136,6 +136,10 @@ class RoleUpdateRequest(BaseModel):
     config: Dict[str, Any]
 
 
+class BatchDeleteRequest(BaseModel):
+    keys: list[str]
+
+
 # ===== API 路由 =====
 
 @app.get("/api/status")
@@ -911,47 +915,114 @@ def update_model(req: ModelUpdateRequest):
     return {"ok": True, "key": req.key}
 
 
+@app.delete("/api/models/batch")
+def delete_models_batch(req: BatchDeleteRequest):
+    """批量删除模型配置"""
+    if not _config:
+        raise HTTPException(status_code=500, detail="配置未初始化")
+
+    keys = req.keys
+    if not keys:
+        raise HTTPException(status_code=400, detail="未指定要删除的模型")
+
+    models = _config.get("models", {})
+    deleted_keys = []
+    failed_keys = []
+    dependent_hotkeys = []
+
+    for key in keys:
+        if key not in models:
+            failed_keys.append(key)
+            continue
+
+        # 检查是否有快捷键引用此模型
+        hotkeys = _config.get("hotkeys", {})
+        for hk_key, hk_config in hotkeys.items():
+            action = hk_config.get("action")
+            if action == "chat" and hk_config.get("target") == key:
+                dependent_hotkeys.append(hk_key)
+
+        # 直接操作字典
+        user_models = _config.user_config.get("models", {})
+        if key in user_models:
+            del user_models[key]
+            deleted_keys.append(key)
+
+    _config._rebuild()
+    _config.save_user_config()
+
+    return {
+        "ok": True,
+        "deleted_count": len(deleted_keys),
+        "deleted_keys": deleted_keys,
+        "failed_keys": failed_keys,
+        "dependent_hotkeys": dependent_hotkeys
+    }
+
+
+@app.delete("/api/models/all")
+def delete_all_models():
+    """清空所有模型配置"""
+    if not _config:
+        raise HTTPException(status_code=500, detail="配置未初始化")
+
+    models = _config.get("models", {})
+    if not models:
+        return {"ok": True, "deleted_count": 0, "message": "没有配置模型"}
+
+    # 检查是否有快捷键引用模型
+    hotkeys = _config.get("hotkeys", {})
+    dependent_hotkeys = []
+
+    for hk_key, hk_config in hotkeys.items():
+        action = hk_config.get("action")
+        if action == "chat":
+            target = hk_config.get("target", "")
+            if target in models:
+                dependent_hotkeys.append(hk_key)
+
+    # 清空用户配置中的所有模型
+    if "models" in _config.user_config:
+        _config.user_config["models"] = {}
+        _config._rebuild()
+        _config.save_user_config()
+
+    return {
+        "ok": True,
+        "deleted_count": len(models),
+        "dependent_hotkeys": dependent_hotkeys
+    }
+
+
 @app.delete("/api/models/{key:path}")
 def delete_model(key: str):
     """删除模型配置"""
     if not _config:
         raise HTTPException(status_code=500, detail="配置未初始化")
-    
+
     models = _config.get("models", {})
     if key not in models:
         raise HTTPException(status_code=404, detail=f"未找到模型: {key}")
-    
+
     # 检查是否有快捷键引用此模型
     hotkeys = _config.get("hotkeys", {})
     dependent_hotkeys = []
-    
+
     for hk_key, hk_config in hotkeys.items():
         action = hk_config.get("action")
-        target = hk_config.get("target")
-        
-        if action == "chat" and target == key:
+        if action == "chat" and hk_config.get("target") == key:
             dependent_hotkeys.append(hk_key)
-        elif action == "role":
-            # 检查角色是否使用此模型
-            roles = _config.get("roles", {})
-            role_config = roles.get(target)
-            if role_config and role_config.get("base_model") == key:
-                dependent_hotkeys.append(f"{hk_key} (通过角色: {target})")
-    
-    if dependent_hotkeys:
-        hotkey_list = ", ".join(dependent_hotkeys)
-        raise HTTPException(
-            status_code=409, 
-            detail=f"无法删除模型 '{key}'，以下快捷键正在使用它: {hotkey_list}。请先删除或修改这些快捷键。"
-        )
-    
+
     # 直接操作字典，避免 key 含 '.' 时路径解析错误
     user_models = _config.user_config.get("models", {})
     if key in user_models:
         del user_models[key]
         _config._rebuild()
         _config.save_user_config()
-    return {"ok": True, "key": key}
+    else:
+        _config.load()
+
+    return {"ok": True, "key": key, "dependent_hotkeys": dependent_hotkeys}
 
 
 # ----- Roles -----

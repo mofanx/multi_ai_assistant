@@ -453,6 +453,9 @@ def build_cli():
 
     model_sub.add_parser("providers", help="列出所有支持的 AI 提供商")
 
+    p_model_clear = model_sub.add_parser("clear", help="清空所有模型")
+    p_model_clear.add_argument("--force", action="store_true", help="强制清空，无需确认")
+
     # --- hotkey ---
     p_hotkey = sub.add_parser("hotkey", help="快捷键管理")
     hotkey_sub = p_hotkey.add_subparsers(dest="hotkey_cmd")
@@ -722,6 +725,30 @@ def cmd_model(args, config: ConfigManager):
         print(f"\n搜索某个提供商的模型:")
         print(f"  maa model search --provider openai")
         print()
+
+    elif args.model_cmd == "clear":
+        models = config.models
+        if not models:
+            print("没有配置模型，无需清空。")
+            return
+
+        model_count = len(models)
+        if not args.force:
+            print(f"将清空所有模型 (共 {model_count} 个)")
+            confirm = input("确认清空? (yes/no): ").strip().lower()
+            if confirm not in ["yes", "y"]:
+                print("已取消")
+                return
+
+        # 清空用户配置中的所有模型
+        if "models" in config.user_config:
+            config.user_config["models"] = {}
+            config._rebuild()
+            config.save_user_config()
+        else:
+            config.load()
+
+        print(f"✓ 已清空所有模型 (共 {model_count} 个)")
 
 
 def cmd_hotkey(args, config: ConfigManager):
